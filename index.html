@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Pangan Cabinet Estimator</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='10' y='10' width='80' height='80' fill='%230f172a' rx='4'/%3E%3Crect x='15' y='15' width='70' height='32' fill='%23d4af37' rx='2'/%3E%3Crect x='15' y='53' width='70' height='32' fill='%23d4af37' rx='2'/%3E%3Ccircle cx='25' cy='31' r='3' fill='%230f172a'/%3E%3Ccircle cx='25' cy='69' r='3' fill='%230f172a'/%3E%3C/svg%3E">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div class="header-content">
+                <h1>
+                    <span class="header-icon">
+                        <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' width='24' height='24'>
+                            <rect x='10' y='10' width='80' height='80' fill='currentColor' rx='4'/>
+                            <rect x='15' y='15' width='70' height='32' fill='#d4af37' rx='2'/>
+                            <rect x='15' y='53' width='70' height='32' fill='#d4af37' rx='2'/>
+                            <circle cx='25' cy='31' r='3' fill='currentColor'/>
+                            <circle cx='25' cy='69' r='3' fill='currentColor'/>
+                        </svg>
+                    </span>
+                    Pangan Cabinet Estimator
+                </h1>
+                <p>Professional cabinet estimation and quotation system</p>
+            </div>
+            <div class="header-actions">
+                <button id="importProjectBtnHeader" class="btn-secondary" style="padding: 10px 20px; font-size: 0.9em;">
+                    ↓ Import Project
+                </button>
+                <input type="file" id="projectFileInputHeader" accept=".json" style="display: none;">
+            </div>
+        </header>
+
+        <!-- Step Progress Indicator -->
+        <div class="step-progress">
+            <div class="step-item active" data-step="1">
+                <div class="step-number">1</div>
+                <div class="step-label">Project Info</div>
+            </div>
+            <div class="step-item" data-step="2">
+                <div class="step-number">2</div>
+                <div class="step-label">Setup Config</div>
+            </div>
+            <div class="step-item" data-step="3">
+                <div class="step-number">3</div>
+                <div class="step-label">Add Cabinets</div>
+            </div>
+            <div class="step-item" data-step="4">
+                <div class="step-number">4</div>
+                <div class="step-label">Review & Quote</div>
+            </div>
+        </div>
+
+        <!-- Step 1: Project Details -->
+        <div class="step-content" id="step1" style="display: block;">
+            <div class="step-navigation top-nav" style="margin-bottom: 20px;">
+                <button class="btn-primary" onclick="goToStep(2)">Next: Setup Configuration →</button>
+            </div>
+            <div class="form-section">
+                <h2>Project Details</h2>
+                <div class="form-group">
+                    <label for="clientName">Client Name:</label>
+                    <input type="text" id="clientName" placeholder="Enter client name">
+                </div>
+                <div class="form-group">
+                    <label for="projectName">Project Name:</label>
+                    <input type="text" id="projectName" list="projectSuggestions" placeholder="e.g., Kitchen Renovation">
+                    <datalist id="projectSuggestions">
+                        <option value="Kitchen Renovation">
+                        <option value="Complete Kitchen Remodel">
+                        <option value="New Kitchen Installation">
+                        <option value="Kitchen Cabinet Upgrade">
+                        <option value="Modular Kitchen Setup">
+                        <option value="Pantry Cabinet Installation">
+                        <option value="Kitchen Storage Solution">
+                        <option value="Custom Kitchen Cabinets">
+                        <option value="Office Cabinet Installation">
+                        <option value="Bedroom Wardrobe">
+                    </datalist>
+                    <small style="color: #666; display: block; margin-top: 5px;">Start typing or click to see suggestions</small>
+                </div>
+            </div>
+            <div class="step-navigation">
+                <button class="btn-primary" onclick="goToStep(2)">Next: Setup Configuration →</button>
+            </div>
+        </div>
+
+        <!-- Step 2: One-Time Setup Configuration -->
+        <div class="step-content" id="step2" style="display: none;">
+            <div class="step-navigation top-nav" style="margin-bottom: 20px;">
+                <button class="btn-secondary" onclick="goToStep(1)">← Back</button>
+                <button class="btn-primary" onclick="goToStep(3)">Next: Add Cabinets →</button>
+            </div>
+            <div class="form-section setup-config">
+                <h2 class="setup-header">
+                    <span class="setup-icon">⚙</span>
+                    <span>One-Time Setup Configuration</span>
+                </h2>
+                <p class="setup-description">Configure these settings once. They will apply to all cabinets in the quote.</p>
+                
+                <div class="setup-section">
+                    <h3 class="setup-section-title">Materials</h3>
+                    <div class="setup-grid">
+                        <div class="form-group compact">
+                            <label for="sheetMaterial">Sheet Material:</label>
+                            <select id="sheetMaterial">
+                                <option value="Plywood">Plywood</option>
+                                <option value="PVC" selected>PVC</option>
+                            </select>
+                        </div>
+                        <div class="form-group compact">
+                            <label for="sheetCost">Material Price (₱/sheet):</label>
+                            <input type="number" id="sheetCost" value="5000" step="1" min="0">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="sheetThickness">Thickness (mm):</label>
+                            <input type="number" id="sheetThickness" value="18" step="1" min="6" max="25">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="edgeBanding">Edge Band (₱/m):</label>
+                            <input type="number" id="edgeBanding" value="50" step="0.01">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="grainOrientation">Grain Orientation:</label>
+                            <select id="grainOrientation">
+                                <option value="horizontal" selected>All Horizontal</option>
+                                <option value="standard">Standard (Vertical for doors/sides)</option>
+                                <option value="vertical">All Vertical</option>
+                            </select>
+                        </div>
+                    </div>
+                    <!-- Hidden kerf field - still used in calculations -->
+                    <input type="hidden" id="kerf" value="3">
+                </div>
+
+                <div class="setup-section">
+                    <h3 class="setup-section-title">Hardware & Finishing</h3>
+                    <div class="setup-grid">
+                        <div class="form-group compact">
+                            <label for="hingesCost">Hinges (₱/door):</label>
+                            <input type="number" id="hingesCost" value="300" step="0.01">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="drawerSlidesCost">Slides (₱/drawer):</label>
+                            <input type="number" id="drawerSlidesCost" value="600" step="0.01">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="handlesCost">Handles (₱/ea):</label>
+                            <input type="number" id="handlesCost" value="0" step="0.01">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="finishCost">Finish (₱/cabinet):</label>
+                            <input type="number" id="finishCost" value="0" step="0.01">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setup-section">
+                    <h3 class="setup-section-title">Labor & Markup</h3>
+                    <div class="setup-grid">
+                        <div class="form-group compact">
+                            <label for="laborHours">Hours/Cabinet:</label>
+                            <input type="number" id="laborHours" value="8" step="0.5">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="laborRate">Rate (₱/hr):</label>
+                            <input type="number" id="laborRate" value="200" step="1">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="markup">Markup (%):</label>
+                            <input type="number" id="markup" value="70" step="1" min="0">
+                        </div>
+                        <div class="form-group compact">
+                            <label for="overhead">Overhead (₱):</label>
+                            <input type="number" id="overhead" value="0" step="1" min="0">
+                        </div>
+                    </div>
+                    <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 0.85em;">
+                        <strong>Formula:</strong> Total = (Materials + Labor) × (1 + Markup%) + Overhead
+                    </div>
+                </div>
+            </div>
+            <div class="step-navigation">
+                <button class="btn-secondary" onclick="goToStep(1)">← Back</button>
+                <button class="btn-primary" onclick="goToStep(3)">Next: Add Cabinets →</button>
+            </div>
+        </div>
+
+        <!-- Step 3: Add Cabinets -->
+        <div class="step-content" id="step3" style="display: none;">
+            <div class="step-navigation top-nav" style="margin-bottom: 20px;">
+                <button class="btn-secondary" onclick="goToStep(2)">← Back</button>
+                <button class="btn-primary" id="proceedToReviewBtnTop" onclick="proceedToReview()">Next: Review & Generate Quote →</button>
+            </div>
+            <div class="form-section">
+                <h2>Cabinet Details</h2>
+                <div class="form-group">
+                    <label for="cabinetName">Cabinet Name/Description:</label>
+                    <input type="text" id="cabinetName" placeholder="e.g., Base Cabinet - Sink">
+                </div>
+                <div class="form-group">
+                    <label for="cabinetGroup">Group/Location:</label>
+                    <input type="text" id="cabinetGroup" list="groupSuggestions" placeholder="e.g., Kitchen, Bedroom, Lavatory">
+                    <datalist id="groupSuggestions">
+                        <option value="Kitchen">
+                        <option value="Bedroom">
+                        <option value="Lavatory">
+                        <option value="Bathroom">
+                        <option value="Living Room">
+                        <option value="Dining Room">
+                        <option value="Office">
+                        <option value="Laundry">
+                        <option value="Pantry">
+                        <option value="Garage">
+                    </datalist>
+                    <small style="color: #666; display: block; margin-top: 5px;">Group cabinets by room or location</small>
+                </div>
+                <div class="dimensions-grid">
+                    <div class="form-group">
+                        <label for="quantity">Quantity:</label>
+                        <input type="number" id="quantity" value="1" min="1">
+                    </div>
+                    <div class="form-group">
+                        <label for="cabinetType">Cabinet Type:</label>
+                        <select id="cabinetType">
+                            <option value="base">Base Cabinet</option>
+                            <option value="wall">Wall Cabinet</option>
+                            <option value="tall">Tall Cabinet</option>
+                            <option value="custom">Custom</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="preSize">Pre-defined Size:</label>
+                        <select id="preSize">
+                            <option value="">Select a standard size...</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="dimensions-grid">
+                    <div class="form-group">
+                        <label for="width">Width (cm):</label>
+                        <input type="number" id="width" placeholder="90" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="height">Height (cm):</label>
+                        <input type="number" id="height" placeholder="75" step="0.1">
+                    </div>
+                    <div class="form-group">
+                        <label for="depth">Depth (cm):</label>
+                        <input type="number" id="depth" placeholder="60" step="0.1">
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <h2>Cabinet Configuration</h2>
+                <div class="form-group">
+                    <label for="numDoors">Number of Doors:</label>
+                    <input type="number" id="numDoors" value="2" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="numDrawers">Number of Drawers:</label>
+                    <input type="number" id="numDrawers" value="0" min="0">
+                </div>
+                <div id="drawerSizesContainer" style="display: none; margin-top: 15px; padding: 15px; background: #f0f0f0; border-radius: 6px;">
+                    <h4 style="margin-bottom: 10px; color: #667eea;">Drawer Heights (cm)</h4>
+                    <div id="drawerSizesInputs"></div>
+                </div>
+                <div class="form-group">
+                    <label for="numShelves">Number of Shelves:</label>
+                    <input type="number" id="numShelves" value="1" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="numVerticalDividers">Vertical Dividers:</label>
+                    <input type="number" id="numVerticalDividers" value="0" min="0" max="10">
+                </div>
+            </div>
+
+            <div class="button-group">
+                <button id="addCabinetBtn" class="btn-primary">Add Cabinet to List</button>
+                <button id="updateCabinetBtn" class="btn-primary" style="display: none;">Update Cabinet</button>
+                <button id="cancelEditBtn" class="btn-secondary" style="display: none;">Cancel Edit</button>
+                <button id="resetCurrentBtn" class="btn-secondary">Clear Form</button>
+            </div>
+
+            <div id="cabinetList" class="cabinet-list-section" style="display: none;">
+                <h2>Cabinets Added</h2>
+                <div id="cabinetItems"></div>
+            </div>
+
+            <div class="step-navigation">
+                <button class="btn-secondary" onclick="goToStep(2)">← Back</button>
+                <button class="btn-primary" id="proceedToReviewBtn" onclick="proceedToReview()">Next: Review & Generate Quote →</button>
+            </div>
+        </div>
+
+        <!-- Step 4: Review & Quote -->
+        <div class="step-content" id="step4" style="display: none;">
+            <div class="step-navigation top-nav" style="margin-bottom: 20px;">
+                <button class="btn-secondary" onclick="goToStep(3)">← Back to Edit Cabinets</button>
+                <button id="calculateBtnTop" class="btn-primary">Generate Quote</button>
+            </div>
+            <div id="cabinetListReview" class="cabinet-list-section">
+                <h2>Cabinets Summary</h2>
+                <div id="cabinetItemsReview"></div>
+                <div class="button-group">
+                    <button class="btn-secondary" onclick="goToStep(3)">← Back to Edit Cabinets</button>
+                    <button id="calculateBtn" class="btn-primary">Generate Quote</button>
+                </div>
+            </div>
+
+            <div id="results" class="results-section" style="display: none;">
+                <h2>Quotation Summary</h2>
+                <div id="quotationContent"></div>
+                <div class="button-group">
+                    <button id="exportProjectBtn" class="btn-primary">Export Project</button>
+                    <button id="simplifiedQuoteBtn" class="btn-primary">Simplified Quote</button>
+                    <button id="printQuoteBtn" class="btn-primary">Print Quote</button>
+                    <button id="copyQuoteBtn" class="btn-secondary">Copy Quote</button>
+                    <button id="viewCutlistBtn" class="btn-secondary">View Cut List</button>
+                </div>
+            </div>
+
+            <div id="simplifiedResults" class="results-section" style="display: none;">
+                <h2>Simplified Quotation</h2>
+                <div id="simplifiedQuotationContent"></div>
+                <div class="button-group">
+                    <button id="printSimplifiedBtn" class="btn-primary">Print Quote</button>
+                    <button id="copySimplifiedBtn" class="btn-secondary">Copy Quote</button>
+                    <button id="backToDetailedBtn" class="btn-secondary">Back to Detailed</button>
+                </div>
+            </div>
+
+            <div id="cutlistResults" class="results-section" style="display: none;">
+                <h2>Cut List & Cutting Diagram</h2>
+                <div id="cutlistContent"></div>
+                <div class="button-group">
+                    <button id="exportCsvBtn" class="btn-primary">Export to CSV</button>
+                    <button id="importCsvBtn" class="btn-primary">Import CSV</button>
+                    <input type="file" id="csvFileInput" accept=".csv" style="display: none;">
+                    <button id="printCutlistBtn" class="btn-primary">Print Cut List</button>
+                    <button id="copyCutlistBtn" class="btn-secondary">Copy Cut List</button>
+                    <button id="backToQuoteBtn" class="btn-secondary">Back to Quote</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
