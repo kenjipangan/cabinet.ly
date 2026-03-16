@@ -76,6 +76,8 @@ class Cabinet {
         const qty = this.quantity;
         const t = this.thickness; // Board thickness
         const kerf = this.kerf || 3; // Kerf/cut thickness (default 3mm)
+        // Extract base material name (remove thickness prefix like "18mm ")
+        const baseMaterial = this.sheetMaterial.replace(/^\d+mm\s*/, '');
 
         // CABINET BOX CONSTRUCTION (Standard modular kitchen method)
         
@@ -141,7 +143,7 @@ class Cabinet {
             height: this.height - 20, // 10mm rabbet top/bottom
             thickness: 6, // Back panels typically 6mm
             quantity: 1 * qty,
-            material: '6mm Plywood/Hardboard',
+            material: `6mm ${baseMaterial}`,
             notes: 'Sits in 10mm rabbet',
             grain: 'none',
             edgeBanding: {
@@ -310,7 +312,7 @@ class Cabinet {
                     height: drawerBoxDepth - 10,
                     thickness: 6,
                     quantity: 1 * qty,
-                    material: '6mm Plywood',
+                    material: `6mm ${baseMaterial}`,
                     notes: 'Sits in 6mm groove, 10mm from bottom edge',
                     grain: 'none',
                     edgeBanding: {
@@ -366,6 +368,107 @@ class CabinetCalculator {
         return Math.ceil(areaWithWaste / sheetArea);
     }
 
+    // Calculate actual sheets needed using bin-packing layout (same as diagram)
+    calculateActualSheetsFromCuts(cuts, sheetWidth, sheetHeight, kerf) {
+        if (!cuts || cuts.length === 0) return 0;
+        
+        // Expand cuts by quantity
+        const pieces = [];
+        cuts.forEach(cut => {
+            for (let i = 0; i < cut.quantity; i++) {
+                pieces.push({
+                    part: cut.part,
+                    width: cut.width,
+                    height: cut.height
+                });
+            }
+        });
+        
+        if (pieces.length === 0) return 0;
+        
+        // Guillotine bin-packing (same as layoutPieces)
+        const sorted = pieces.map((p, i) => {
+            const w = Math.min(p.width, p.height);
+            const h = Math.max(p.width, p.height);
+            return { ...p, w, h, area: w * h, idx: i };
+        }).sort((a, b) => b.area - a.area || b.h - a.h);
+
+        const sheets = [];
+
+        function createSheet() {
+            return {
+                pieces: [],
+                freeRects: [{ x: 0, y: 0, w: sheetWidth, h: sheetHeight }]
+            };
+        }
+
+        function findBestFit(freeRects, pw, ph) {
+            let bestScore = Infinity;
+            let bestIdx = -1;
+
+            for (let i = 0; i < freeRects.length; i++) {
+                const r = freeRects[i];
+                // Only try the given orientation (no rotation)
+                if (pw <= r.w && ph <= r.h) {
+                    const leftover = Math.min(r.w - pw, r.h - ph);
+                    if (leftover < bestScore) {
+                        bestScore = leftover;
+                        bestIdx = i;
+                    }
+                }
+            }
+            return { idx: bestIdx };
+        }
+
+        function splitRect(freeRect, pw, ph, k) {
+            const results = [];
+            const kw = pw + k;
+            const kh = ph + k;
+            if (freeRect.w - kw > k) {
+                results.push({ x: freeRect.x + kw, y: freeRect.y, w: freeRect.w - kw, h: freeRect.h });
+            }
+            if (freeRect.h - kh > k) {
+                results.push({ x: freeRect.x, y: freeRect.y + kh, w: pw, h: freeRect.h - kh });
+            }
+            return results;
+        }
+
+        function placePiece(sheet, piece) {
+            const { idx } = findBestFit(sheet.freeRects, piece.w, piece.h);
+            if (idx === -1) return false;
+            const rect = sheet.freeRects[idx];
+            sheet.pieces.push({ ...piece, x: rect.x, y: rect.y, width: piece.w, height: piece.h });
+            const newRects = splitRect(rect, piece.w, piece.h, kerf);
+            sheet.freeRects.splice(idx, 1, ...newRects);
+            return true;
+        }
+
+        sorted.forEach(piece => {
+            const minDim = Math.min(piece.w, piece.h);
+            const maxDim = Math.max(piece.w, piece.h);
+            if ((minDim > sheetWidth && minDim > sheetHeight) ||
+                (maxDim > sheetWidth && maxDim > sheetHeight)) {
+                sheets.push(createSheet());
+                return;
+            }
+
+            let placed = false;
+            for (let s = 0; s < sheets.length; s++) {
+                if (placePiece(sheets[s], piece)) {
+                    placed = true;
+                    break;
+                }
+            }
+            if (!placed) {
+                const newSheet = createSheet();
+                placePiece(newSheet, piece);
+                sheets.push(newSheet);
+            }
+        });
+
+        return sheets.length;
+    }
+
     calculateEdgeBanding(width, height, depth, numDoors, numShelves) {
         let totalLength = 0;
         
@@ -390,11 +493,16 @@ class CabinetCalculator {
 
     generateQuote(cabinets, pricing) {
         let totalArea = 0;
+        let totalArea6mm = 0;
         let totalEdgeBanding = 0;
         let totalDoors = 0;
         let totalDrawers = 0;
         let totalHandles = 0;
         let totalDrawerSlidesCost = 0;
+        
+        // Collect cuts by thickness for accurate sheet counting
+        let mainCuts = [];   // >= 12mm
+        let thinCuts = [];   // <= 6mm
 
         // Calculate totals from all cabinets using actual cut lists
         cabinets.forEach(cabinet => {
@@ -405,6 +513,11 @@ class CabinetCalculator {
                 // Only count main sheet material (thickness >= 12mm), not back panels or drawer bottoms
                 if (cut.thickness >= 12) {
                     totalArea += (cut.width * cut.height * cut.quantity);
+                    mainCuts.push(cut);
+                } else if (cut.thickness <= 6) {
+                    // Track 6mm material (back panels, drawer bottoms)
+                    totalArea6mm += (cut.width * cut.height * cut.quantity);
+                    thinCuts.push(cut);
                 }
                 
                 // Calculate edge banding from cut list
@@ -429,10 +542,13 @@ class CabinetCalculator {
         // Labor hours is already calculated as total units * 8 hours per unit
         const totalLaborHours = pricing.laborHours;
 
-        const sheetsNeeded = this.calculateSheetsNeeded(totalArea);
+        const kerf = cabinets[0]?.kerf || 3;
+        const sheetsNeeded = this.calculateActualSheetsFromCuts(mainCuts, this.sheetSize.width, this.sheetSize.height, kerf);
+        const sheetsNeeded6mm = this.calculateActualSheetsFromCuts(thinCuts, this.sheetSize.width, this.sheetSize.height, kerf);
         
         // Material costs
         const sheetMaterialCost = sheetsNeeded * pricing.sheetCost;
+        const sheet6mmCost = sheetsNeeded6mm * (pricing.sheet6mmCost || 0);
         const edgeBandingCost = totalEdgeBanding * pricing.edgeBanding;
         
         // Hardware costs
@@ -442,7 +558,7 @@ class CabinetCalculator {
         const screwsCost = pricing.screwsCost * cabinets.reduce((sum, c) => sum + c.quantity, 0);
         
         // Subtotals
-        const materialSubtotal = sheetMaterialCost + edgeBandingCost;
+        const materialSubtotal = sheetMaterialCost + sheet6mmCost + edgeBandingCost;
         const hardwareSubtotal = hingesCost + drawerSlidesCost + handlesCost + screwsCost;
         const laborCost = totalLaborHours * pricing.laborRate;
         
@@ -464,6 +580,9 @@ class CabinetCalculator {
                 sheetsNeeded,
                 totalArea: (totalArea / 1000000).toFixed(2),
                 sheetMaterialCost: sheetMaterialCost.toFixed(2),
+                sheetsNeeded6mm,
+                totalArea6mm: (totalArea6mm / 1000000).toFixed(2),
+                sheet6mmCost: sheet6mmCost.toFixed(2),
                 edgeBandingMeters: totalEdgeBanding.toFixed(2),
                 edgeBandingCost: edgeBandingCost.toFixed(2),
                 materialSubtotal: materialSubtotal.toFixed(2)
@@ -1136,13 +1255,27 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Generate cut list
         let allCuts = [];
+        let thinCuts = [];
+        let count6mmParts = 0;
+        let totalArea6mm = 0;
         cabinets.forEach(cabinet => {
             const cuts = cabinet.getCutList();
             cuts.forEach(cut => {
                 cut.cabinetName = cabinet.name;
+                // Track 6mm parts
+                if (cut.thickness <= 6) {
+                    thinCuts.push(cut);
+                    totalArea6mm += (cut.width * cut.height * cut.quantity);
+                    count6mmParts += cut.quantity;
+                }
             });
             allCuts = allCuts.concat(cuts);
         });
+        
+        // Calculate 6mm sheets needed using bin-packing (matches diagram)
+        const kerf = cabinets[0]?.kerf || 3;
+        const calc = new CabinetCalculator();
+        const sheetsNeeded6mm = calc.calculateActualSheetsFromCuts(thinCuts, 1220, 2440, kerf);
 
         // Group cuts by cabinet, part type and dimensions
         const groupedCuts = {};
@@ -1186,6 +1319,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <h3>CUT LIST & CUTTING DIAGRAM</h3>
                 <p><strong>Date:</strong> ${today}</p>
                 <p><strong>Material:</strong> ${sheetMaterialName}</p>
+                ${sheetsNeeded6mm > 0 ? `<p><strong>6mm Backing:</strong> ${sheetsNeeded6mm} sheet(s) needed (${count6mmParts} parts, ${(totalArea6mm / 1000000).toFixed(2)} m²)</p>` : ''}
             </div>
 
             <div class="cutlist-section">
@@ -1294,6 +1428,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span>${sheetMaterialName} (${quote.materials.sheetsNeeded} sheets, ${quote.materials.totalArea} m²)</span>
                     <span>₱${formatPrice(quote.materials.sheetMaterialCost)}</span>
                 </div>
+                ${quote.materials.sheetsNeeded6mm > 0 ? `
+                <div class="quote-item">
+                    <span>6mm Backing (${quote.materials.sheetsNeeded6mm} sheets, ${quote.materials.totalArea6mm} m²)</span>
+                    <span>₱${formatPrice(quote.materials.sheet6mmCost)}</span>
+                </div>` : ''}
                 <div class="quote-item">
                     <span>Edge Banding (${quote.materials.edgeBandingMeters}m)</span>
                     <span>₱${formatPrice(quote.materials.edgeBandingCost)}</span>
@@ -1388,6 +1527,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const pricing = {
             sheetCost: sheetCost,
+            sheet6mmCost: parseFloat(document.getElementById('sheet6mmCost').value) || 500,
             edgeBanding: parseFloat(document.getElementById('edgeBanding').value) || 50,
             hingesCost: parseFloat(document.getElementById('hingesCost').value) || 300,
             slidePrices: {
@@ -1530,6 +1670,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const pricing = {
             sheetCost: sheetCost,
+            sheet6mmCost: parseFloat(document.getElementById('sheet6mmCost').value) || 500,
             edgeBanding: parseFloat(document.getElementById('edgeBanding').value) || 50,
             hingesCost: parseFloat(document.getElementById('hingesCost').value) || 300,
             slidePrices: {
@@ -2357,163 +2498,165 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function layoutPieces(pieces, sheetWidth, sheetHeight, kerf) {
+        // Guillotine bin-packing with best-area-fit and rotation support
+        
+        // Sort pieces by area descending (largest first), then by longest side
+        const sorted = pieces.map((p, i) => {
+            const w = Math.min(p.width, p.height);
+            const h = Math.max(p.width, p.height);
+            return { ...p, w, h, area: w * h, idx: i };
+        }).sort((a, b) => b.area - a.area || b.h - a.h);
+
         const sheets = [];
-        
-        // Normalize: shorter side = x-width, longer side = y-height
-        const normalized = pieces.map(p => {
-            const shorter = Math.min(p.width, p.height);
-            const longer = Math.max(p.width, p.height);
-            return { ...p, w: shorter, h: longer };
-        });
-        
-        // Group pieces by their width (x-dimension) for shared rip cuts
-        const widthGroups = {};
-        normalized.forEach(piece => {
-            const key = piece.w;
-            if (!widthGroups[key]) widthGroups[key] = [];
-            widthGroups[key].push(piece);
-        });
-        
-        // Sort groups: widest strips first (better packing)
-        const sortedWidths = Object.keys(widthGroups)
-            .map(Number)
-            .sort((a, b) => b - a);
-        
-        // Within each group, sort by height descending (tallest first)
-        sortedWidths.forEach(w => {
-            widthGroups[w].sort((a, b) => b.h - a.h);
-        });
-        
-        // Build strips: each strip is a column of same-width pieces
-        // One rip cut per strip, then cross cuts within
-        const strips = [];
-        sortedWidths.forEach(w => {
-            const group = widthGroups[w];
-            let stripPieces = [];
-            let usedHeight = 0;
-            
-            group.forEach(piece => {
-                const neededHeight = piece.h + (stripPieces.length > 0 ? kerf : 0);
-                if (usedHeight + neededHeight <= sheetHeight) {
-                    stripPieces.push(piece);
-                    usedHeight += neededHeight;
-                } else {
-                    // Current strip is full, save it and start new one
-                    if (stripPieces.length > 0) {
-                        strips.push({ width: w, height: usedHeight, pieces: stripPieces });
-                    }
-                    stripPieces = [piece];
-                    usedHeight = piece.h;
-                }
-            });
-            if (stripPieces.length > 0) {
-                strips.push({ width: w, height: usedHeight, pieces: stripPieces });
-            }
-        });
-        
-        // Now pack strips onto sheets left-to-right
-        // Each strip uses: strip.width + kerf on x-axis
+
         function createSheet() {
-            return { pieces: [], usedWidth: 0 };
+            return {
+                pieces: [],
+                // Free rectangles available for placement
+                freeRects: [{ x: 0, y: 0, w: sheetWidth, h: sheetHeight }]
+            };
         }
-        
-        let currentSheet = createSheet();
-        
-        strips.forEach(strip => {
-            const stripW = strip.width + (currentSheet.usedWidth > 0 ? kerf : 0);
-            
-            if (currentSheet.usedWidth + stripW <= sheetWidth) {
-                // Place strip on current sheet
-                placeStrip(currentSheet, strip);
-            } else {
-                // Try existing sheets
-                let placed = false;
-                for (let s = 0; s < sheets.length; s++) {
-                    const sw = strip.width + (sheets[s].usedWidth > 0 ? kerf : 0);
-                    if (sheets[s].usedWidth + sw <= sheetWidth) {
-                        placeStrip(sheets[s], strip);
-                        placed = true;
+
+        // Find best free rect for a piece (Best Short Side Fit)
+        function findBestFit(freeRects, pw, ph) {
+            let bestScore = Infinity;
+            let bestIdx = -1;
+
+            for (let i = 0; i < freeRects.length; i++) {
+                const r = freeRects[i];
+
+                // Only try the given orientation (no rotation)
+                if (pw <= r.w && ph <= r.h) {
+                    const leftover = Math.min(r.w - pw, r.h - ph);
+                    if (leftover < bestScore) {
+                        bestScore = leftover;
+                        bestIdx = i;
+                    }
+                }
+            }
+
+            return { idx: bestIdx };
+        }
+
+        // Split a free rectangle after placing a piece using guillotine split
+        function splitRect(freeRect, pw, ph, kerf) {
+            const results = [];
+            const kw = pw + kerf;
+            const kh = ph + kerf;
+
+            // Right remainder
+            const rw = freeRect.w - kw;
+            if (rw > kerf) {
+                results.push({
+                    x: freeRect.x + kw,
+                    y: freeRect.y,
+                    w: rw,
+                    h: freeRect.h
+                });
+            }
+
+            // Bottom remainder
+            const bh = freeRect.h - kh;
+            if (bh > kerf) {
+                results.push({
+                    x: freeRect.x,
+                    y: freeRect.y + kh,
+                    w: pw,
+                    h: bh
+                });
+            }
+
+            return results;
+        }
+
+        // Try to place a piece on an existing sheet
+        function placePiece(sheet, piece) {
+            const { idx } = findBestFit(sheet.freeRects, piece.w, piece.h);
+            if (idx === -1) return false;
+
+            const rect = sheet.freeRects[idx];
+
+            sheet.pieces.push({
+                ...piece,
+                x: rect.x,
+                y: rect.y,
+                width: piece.w,
+                height: piece.h
+            });
+
+            // Split the used rect and replace it with remainders
+            const newRects = splitRect(rect, piece.w, piece.h, kerf);
+            sheet.freeRects.splice(idx, 1, ...newRects);
+
+            // Merge overlapping/adjacent free rects to reduce fragmentation
+            mergeFreeRects(sheet.freeRects);
+
+            return true;
+        }
+
+        // Merge free rects that can be combined
+        function mergeFreeRects(rects) {
+            for (let i = 0; i < rects.length; i++) {
+                for (let j = i + 1; j < rects.length; j++) {
+                    const a = rects[i];
+                    const b = rects[j];
+
+                    // Check if b is fully contained in a
+                    if (b.x >= a.x && b.y >= a.y &&
+                        b.x + b.w <= a.x + a.w && b.y + b.h <= a.y + a.h) {
+                        rects.splice(j, 1);
+                        j--;
+                        continue;
+                    }
+                    // Check if a is fully contained in b
+                    if (a.x >= b.x && a.y >= b.y &&
+                        a.x + a.w <= b.x + b.w && a.y + a.h <= b.y + b.h) {
+                        rects.splice(i, 1);
+                        i--;
                         break;
                     }
                 }
-                if (!placed) {
-                    if (currentSheet.pieces.length > 0) {
-                        sheets.push(currentSheet);
-                    }
-                    currentSheet = createSheet();
-                    placeStrip(currentSheet, strip);
+            }
+        }
+
+        // Place all pieces
+        sorted.forEach(piece => {
+            // Check if piece is oversized
+            const minDim = Math.min(piece.w, piece.h);
+            const maxDim = Math.max(piece.w, piece.h);
+            if ((minDim > sheetWidth && minDim > sheetHeight) ||
+                (maxDim > sheetWidth && maxDim > sheetHeight)) {
+                // Oversized - put on its own sheet
+                const s = createSheet();
+                s.pieces.push({
+                    ...piece,
+                    x: 0,
+                    y: 0,
+                    width: Math.min(piece.w, sheetWidth),
+                    height: Math.min(piece.h, sheetHeight),
+                    oversized: true
+                });
+                sheets.push(s);
+                return;
+            }
+
+            // Try existing sheets (best fit across all sheets)
+            let placed = false;
+            for (let s = 0; s < sheets.length; s++) {
+                if (placePiece(sheets[s], piece)) {
+                    placed = true;
+                    break;
                 }
+            }
+
+            if (!placed) {
+                const newSheet = createSheet();
+                placePiece(newSheet, piece);
+                sheets.push(newSheet);
             }
         });
-        
-        if (currentSheet.pieces.length > 0) {
-            sheets.push(currentSheet);
-        }
-        
-        function placeStrip(sheet, strip) {
-            const x = sheet.usedWidth + (sheet.usedWidth > 0 ? kerf : 0);
-            let y = 0;
-            
-            strip.pieces.forEach(piece => {
-                // Check if piece fits on sheet
-                if (piece.w > sheetWidth || piece.h > sheetHeight) {
-                    console.warn(`Piece ${piece.part} (${piece.w}×${piece.h}mm) too large for sheet.`);
-                    sheet.pieces.push({
-                        ...piece,
-                        x: x,
-                        y: y,
-                        width: Math.min(piece.w, sheetWidth - x),
-                        height: Math.min(piece.h, sheetHeight - y),
-                        oversized: true
-                    });
-                } else {
-                    sheet.pieces.push({
-                        ...piece,
-                        x: x,
-                        y: y,
-                        width: piece.w,
-                        height: piece.h
-                    });
-                }
-                y += piece.h + kerf;
-            });
-            
-            sheet.usedWidth = x + strip.width;
-        }
-        
+
         return sheets;
-    }
-
-    function findPosition(usedArea, width, height, sheetWidth, sheetHeight, kerf) {
-        // Legacy function kept for compatibility
-        const step = 10;
-        
-        for (let y = 0; y <= sheetHeight - height; y += step) {
-            for (let x = 0; x <= sheetWidth - width; x += step) {
-                const testRect = { x, y, width: width + kerf, height: height + kerf };
-                
-                let overlaps = false;
-                for (let used of usedArea) {
-                    if (rectanglesOverlap(testRect, used)) {
-                        overlaps = true;
-                        break;
-                    }
-                }
-                
-                if (!overlaps) {
-                    return { x, y };
-                }
-            }
-        }
-        
-        return null;
-    }
-
-    function rectanglesOverlap(rect1, rect2) {
-        return !(rect1.x + rect1.width <= rect2.x ||
-                 rect2.x + rect2.width <= rect1.x ||
-                 rect1.y + rect1.height <= rect2.y ||
-                 rect2.y + rect2.height <= rect1.y);
     }
 
     // Function to print content in a new window
@@ -2714,6 +2857,33 @@ document.addEventListener('DOMContentLoaded', () => {
                         
                         .cutting-diagram-section {
                             page-break-before: always;
+                        }
+                        
+                        .sheet-container {
+                            page-break-before: always;
+                            page-break-inside: avoid;
+                            text-align: center;
+                            padding-top: 20px;
+                        }
+                        
+                        .sheet-container:first-child {
+                            page-break-before: avoid;
+                        }
+                        
+                        .sheet-canvas {
+                            transform: scale(2.5);
+                            transform-origin: top left;
+                            margin-bottom: 200px;
+                            margin-left: 60px;
+                        }
+                        
+                        .sheet-title {
+                            font-size: 1.4em;
+                            margin-bottom: 20px;
+                        }
+                        
+                        .legend {
+                            page-break-before: avoid;
                         }
                     }
                 </style>
