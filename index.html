@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -31,7 +32,7 @@
             </div>
             <div class="header-actions">
                 <button id="importProjectBtnHeader" class="btn-secondary" style="padding: 10px 20px; font-size: 0.9em;">
-                    ↓ Import Project
+                    <i class="bi bi-download"></i> Import Project
                 </button>
                 <input type="file" id="projectFileInputHeader" accept=".json" style="display: none;">
             </div>
@@ -153,13 +154,13 @@
                             <input type="number" id="handlesCost" value="0" step="0.01">
                         </div>
                         <div class="form-group compact">
-                            <label for="finishCost">Finish (₱/cabinet):</label>
-                            <input type="number" id="finishCost" value="0" step="0.01">
+                            <label for="screwsCost">Screws (₱/cabinet):</label>
+                            <input type="number" id="screwsCost" value="150" step="1">
                         </div>
                     </div>
                     <div style="margin-top: 15px;">
                         <label style="font-size: 0.88em; font-weight: 500; display: block; margin-bottom: 10px;">Drawer Slide Prices (₱/pair):</label>
-                        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;">
+                        <div class="slide-prices-grid">
                             <div class="form-group compact">
                                 <label for="slidePrice300">300mm:</label>
                                 <input type="number" id="slidePrice300" value="350" step="1">
@@ -227,7 +228,7 @@
             </div>
             <div class="form-section" style="padding: 16px;">
                 <h2 style="margin-bottom: 12px;">Add Cabinet</h2>
-                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                <div class="cabinet-row-1">
                     <div class="form-group compact">
                         <label for="cabinetName">Name:</label>
                         <input type="text" id="cabinetName" placeholder="e.g., Base Cabinet - Sink">
@@ -246,12 +247,6 @@
                         </datalist>
                     </div>
                     <div class="form-group compact">
-                        <label for="quantity">Qty:</label>
-                        <input type="number" id="quantity" value="1" min="1">
-                    </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
-                    <div class="form-group compact">
                         <label for="cabinetType">Type:</label>
                         <select id="cabinetType">
                             <option value="base">Base</option>
@@ -261,29 +256,35 @@
                         </select>
                     </div>
                     <div class="form-group compact">
-                        <label for="preSize">Size:</label>
+                        <label for="quantity">Qty:</label>
+                        <input type="number" id="quantity" value="1" min="1">
+                    </div>
+                </div>
+                <div class="cabinet-row-2">
+                    <div class="form-group compact">
+                        <label for="preSize">Pre-defined Size:</label>
                         <select id="preSize">
-                            <option value="">Standard...</option>
+                            <option value="">Select a size...</option>
                         </select>
                     </div>
                     <div class="form-group compact">
-                        <label for="width">W (cm):</label>
+                        <label for="width">Width (cm):</label>
                         <input type="number" id="width" placeholder="90" step="0.1">
                     </div>
                     <div class="form-group compact">
-                        <label for="height">H (cm):</label>
+                        <label for="height">Height (cm):</label>
                         <input type="number" id="height" placeholder="75" step="0.1">
                     </div>
                     <div class="form-group compact">
-                        <label for="depth">D (cm):</label>
+                        <label for="depth">Depth (cm):</label>
                         <input type="number" id="depth" placeholder="60" step="0.1">
                     </div>
+                </div>
+                <div class="cabinet-row-3">
                     <div class="form-group compact">
                         <label for="numDoors">Doors:</label>
                         <input type="number" id="numDoors" value="2" min="0">
                     </div>
-                </div>
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 3fr; gap: 10px; margin-top: 10px;">
                     <div class="form-group compact">
                         <label for="numDrawers">Drawers:</label>
                         <input type="number" id="numDrawers" value="0" min="0">
@@ -296,7 +297,6 @@
                         <label for="numVerticalDividers">Dividers:</label>
                         <input type="number" id="numVerticalDividers" value="0" min="0" max="10">
                     </div>
-                    <div></div>
                 </div>
                 <div id="drawerSizesContainer" style="display: none; margin-top: 10px; padding: 12px; background: var(--bg-subtle, #2a2a2a); border-radius: 6px; border: 1px solid var(--border-default, rgba(255,255,255,0.07));">
                     <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 10px;">
@@ -387,6 +387,11 @@
         </div>
     </div>
 
+    <footer style="text-align: center; padding: 16px; color: var(--text-tertiary, #6a6a6a); font-size: 0.8em;">
+        © 2026 by Kenji Pangan. All rights reserved.
+    </footer>
+
+    <div class="toast-container" id="toastContainer"></div>
     <script src="app.js"></script>
 </body>
 </html>

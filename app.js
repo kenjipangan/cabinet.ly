@@ -1,5 +1,44 @@
 // Cabinet Quotation Calculator
 
+// Toast notification system
+function showToast(message, type = 'info', duration = 4000) {
+    const container = document.getElementById('toastContainer');
+    const toast = document.createElement('div');
+    toast.className = `toast toast-${type}`;
+    
+    const icons = {
+        success: '<i class="bi bi-check-circle"></i>',
+        error: '<i class="bi bi-x-circle"></i>',
+        warning: '<i class="bi bi-exclamation-triangle"></i>',
+        info: '<i class="bi bi-info-circle"></i>'
+    };
+    
+    const titles = {
+        success: 'Success',
+        error: 'Error',
+        warning: 'Warning',
+        info: 'Info'
+    };
+    
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <div class="toast-body">
+            <div class="toast-title">${titles[type] || titles.info}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+    
+    container.appendChild(toast);
+    
+    if (duration > 0) {
+        setTimeout(() => {
+            toast.classList.add('toast-out');
+            setTimeout(() => toast.remove(), 300);
+        }, duration);
+    }
+}
+
 class Cabinet {
     constructor(data) {
         this.name = data.cabinetName;
@@ -400,11 +439,11 @@ class CabinetCalculator {
         const hingesCost = totalDoors * pricing.hingesCost;
         const drawerSlidesCost = totalDrawerSlidesCost;
         const handlesCost = totalHandles * pricing.handlesCost;
-        const finishCost = pricing.finishCost * cabinets.reduce((sum, c) => sum + c.quantity, 0);
+        const screwsCost = pricing.screwsCost * cabinets.reduce((sum, c) => sum + c.quantity, 0);
         
         // Subtotals
         const materialSubtotal = sheetMaterialCost + edgeBandingCost;
-        const hardwareSubtotal = hingesCost + drawerSlidesCost + handlesCost + finishCost;
+        const hardwareSubtotal = hingesCost + drawerSlidesCost + handlesCost + screwsCost;
         const laborCost = totalLaborHours * pricing.laborRate;
         
         // New calculation: Materials + Labor = Base Cost
@@ -436,7 +475,7 @@ class CabinetCalculator {
                 hingesCost: hingesCost.toFixed(2),
                 drawerSlidesCost: drawerSlidesCost.toFixed(2),
                 handlesCost: handlesCost.toFixed(2),
-                finishCost: finishCost.toFixed(2),
+                screwsCost: screwsCost.toFixed(2),
                 hardwareSubtotal: hardwareSubtotal.toFixed(2)
             },
             labor: {
@@ -536,7 +575,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     window.proceedToReview = function() {
         if (cabinets.length === 0) {
-            alert('Please add at least one cabinet before proceeding!');
+            showToast('Please add at least one cabinet before proceeding.', 'warning');
             return;
         }
         
@@ -561,21 +600,30 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         Object.keys(groupedCabinets).sort().forEach(group => {
             html += `
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: var(--accent); font-size: 1.1em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--accent);">
+                <div style="margin-bottom: 16px;">
+                    <h3 style="color: var(--accent); font-size: 0.95em; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--accent);">
                         ${group}
                     </h3>
             `;
             
             groupedCabinets[group].forEach(({ cabinet, index }) => {
+                const config = [];
+                if (cabinet.numDoors > 0) config.push(`${cabinet.numDoors}D`);
+                if (cabinet.numDrawers > 0) config.push(`${cabinet.numDrawers}Dr`);
+                if (cabinet.numShelves > 0) config.push(`${cabinet.numShelves}S`);
+                if (cabinet.numVerticalDividers > 0) config.push(`${cabinet.numVerticalDividers}V`);
+                
                 html += `
-                    <div class="cabinet-item">
-                        <div class="cabinet-item-info">
-                            <h4>${cabinet.name} (x${cabinet.quantity})</h4>
-                            <p>${(cabinet.width/10).toFixed(1)}cm × ${(cabinet.height/10).toFixed(1)}cm × ${(cabinet.depth/10).toFixed(1)}cm</p>
-                            <p>${cabinet.numDoors} doors, ${cabinet.numDrawers} drawers${cabinet.numDrawers > 0 ? ` (${cabinet.drawerSlideLength}mm slides)` : ''}${cabinet.drawerHeights.length > 0 ? ` (${cabinet.drawerHeights.map(h => (h/10).toFixed(1)).join('cm, ')}cm)` : ''}, ${cabinet.numShelves} shelves${cabinet.numVerticalDividers > 0 ? `, ${cabinet.numVerticalDividers} dividers` : ''}</p>
+                    <div class="cabinet-item" style="padding: 10px 12px;">
+                        <div class="cabinet-item-info" style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                <strong style="font-size: 0.95em;">${cabinet.name}</strong>
+                                <span style="color: var(--text-secondary); font-size: 0.85em;">×${cabinet.quantity}</span>
+                                <span style="color: var(--text-tertiary); font-size: 0.85em;">${(cabinet.width/10).toFixed(1)}×${(cabinet.height/10).toFixed(1)}×${(cabinet.depth/10).toFixed(1)}cm</span>
+                                <span style="color: var(--text-tertiary); font-size: 0.8em;">${config.join(' ')}</span>
+                            </div>
                         </div>
-                        <button class="btn-remove" onclick="removeCabinetFromReview(${index})">Remove</button>
+                        <button class="btn-icon btn-icon-danger" onclick="removeCabinetFromReview(${index})" title="Remove"><i class="bi bi-trash"></i></button>
                     </div>
                 `;
             });
@@ -591,7 +639,7 @@ document.addEventListener('DOMContentLoaded', () => {
         updateCabinetListReview();
         updateCabinetList();
         if (cabinets.length === 0) {
-            alert('No cabinets remaining. Returning to Add Cabinets step.');
+            showToast('No cabinets remaining. Returning to Add Cabinets step.', 'info');
             goToStep(3);
         }
     };
@@ -704,7 +752,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const cabinetType = cabinetTypeSelect.value;
         const sizes = standardSizes[cabinetType] || [];
         
-        preSizeSelect.innerHTML = '<option value="">Select a standard size...</option>';
+        preSizeSelect.innerHTML = '<option value="">Select a size...</option>';
         
         sizes.forEach(size => {
             const option = document.createElement('option');
@@ -748,7 +796,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const maxDrawers = Math.floor(heightCm / 10); // Minimum ~10cm per drawer
         
         if (numDrawers > maxDrawers && heightCm > 0) {
-            alert(`Maximum recommended drawers for ${heightCm}cm height is ${maxDrawers}. You entered ${numDrawers}.`);
+            showToast(`Maximum recommended drawers for ${heightCm}cm height is ${maxDrawers}. You entered ${numDrawers}.`, 'warning');
         }
         
         if (numDrawers > 0) {
@@ -823,6 +871,13 @@ document.addEventListener('DOMContentLoaded', () => {
         validateDrawerHeights();
     }
 
+    function getAutoName(cabinetType) {
+        const typeLabels = { base: 'Base Cabinet', wall: 'Wall Cabinet', tall: 'Tall Cabinet', custom: 'Custom Cabinet' };
+        const label = typeLabels[cabinetType] || 'Cabinet';
+        const existing = cabinets.filter(c => c.name.startsWith(label)).length;
+        return `${label} ${existing + 1}`;
+    }
+
     function getCabinetData() {
         const numDrawers = parseInt(document.getElementById('numDrawers').value) || 0;
         const drawerHeights = [];
@@ -839,15 +894,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const thickness = parseFloat(document.getElementById('sheetThickness').value) || 18;
         const fullMaterialName = `${thickness}mm ${sheetMaterial}`;
         const grainOrientation = document.getElementById('grainOrientation').value || 'standard';
+        const cabinetType = document.getElementById('cabinetType').value;
 
         return {
-            cabinetName: document.getElementById('cabinetName').value || 'Unnamed Cabinet',
+            cabinetName: document.getElementById('cabinetName').value || getAutoName(cabinetType),
             cabinetGroup: document.getElementById('cabinetGroup').value || 'Ungrouped',
             quantity: parseInt(document.getElementById('quantity').value) || 1,
             width: parseFloat(document.getElementById('width').value) * 10 || 900, // Convert cm to mm
             height: parseFloat(document.getElementById('height').value) * 10 || 750, // Convert cm to mm
             depth: parseFloat(document.getElementById('depth').value) * 10 || 600, // Convert cm to mm
-            cabinetType: document.getElementById('cabinetType').value,
+            cabinetType: cabinetType,
             numDoors: parseInt(document.getElementById('numDoors').value) || 0,
             numDrawers: numDrawers,
             drawerHeights: drawerHeights,
@@ -905,23 +961,32 @@ document.addEventListener('DOMContentLoaded', () => {
         let html = '';
         Object.keys(groupedCabinets).sort().forEach(group => {
             html += `
-                <div style="margin-bottom: 25px;">
-                    <h3 style="color: var(--accent); font-size: 1.1em; margin-bottom: 12px; padding-bottom: 8px; border-bottom: 2px solid var(--accent);">
+                <div style="margin-bottom: 16px;">
+                    <h3 style="color: var(--accent); font-size: 0.95em; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid var(--accent);">
                         ${group}
                     </h3>
             `;
             
             groupedCabinets[group].forEach(({ cabinet, index }) => {
+                const config = [];
+                if (cabinet.numDoors > 0) config.push(`${cabinet.numDoors}D`);
+                if (cabinet.numDrawers > 0) config.push(`${cabinet.numDrawers}Dr`);
+                if (cabinet.numShelves > 0) config.push(`${cabinet.numShelves}S`);
+                if (cabinet.numVerticalDividers > 0) config.push(`${cabinet.numVerticalDividers}V`);
+                
                 html += `
-                    <div class="cabinet-item">
-                        <div class="cabinet-item-info">
-                            <h4>${cabinet.name} (x${cabinet.quantity})</h4>
-                            <p>${(cabinet.width/10).toFixed(1)}cm × ${(cabinet.height/10).toFixed(1)}cm × ${(cabinet.depth/10).toFixed(1)}cm</p>
-                            <p>${cabinet.numDoors} doors, ${cabinet.numDrawers} drawers${cabinet.numDrawers > 0 ? ` (${cabinet.drawerSlideLength}mm slides)` : ''}${cabinet.drawerHeights.length > 0 ? ` (${cabinet.drawerHeights.map(h => (h/10).toFixed(1)).join('cm, ')}cm)` : ''}, ${cabinet.numShelves} shelves${cabinet.numVerticalDividers > 0 ? `, ${cabinet.numVerticalDividers} dividers` : ''}</p>
+                    <div class="cabinet-item" style="padding: 10px 12px;">
+                        <div class="cabinet-item-info" style="flex: 1;">
+                            <div style="display: flex; align-items: center; gap: 12px; flex-wrap: wrap;">
+                                <strong style="font-size: 0.95em;">${cabinet.name}</strong>
+                                <span style="color: var(--text-secondary); font-size: 0.85em;">×${cabinet.quantity}</span>
+                                <span style="color: var(--text-tertiary); font-size: 0.85em;">${(cabinet.width/10).toFixed(1)}×${(cabinet.height/10).toFixed(1)}×${(cabinet.depth/10).toFixed(1)}cm</span>
+                                <span style="color: var(--text-tertiary); font-size: 0.8em;">${config.join(' ')}</span>
+                            </div>
                         </div>
-                        <div style="display: flex; gap: 10px;">
-                            <button class="btn-secondary" onclick="editCabinet(${index})" style="padding: 10px 20px;">Edit</button>
-                            <button class="btn-remove" onclick="removeCabinet(${index})">Remove</button>
+                        <div style="display: flex; gap: 6px;">
+                            <button class="btn-icon" onclick="editCabinet(${index})" title="Edit"><i class="bi bi-pencil"></i></button>
+                            <button class="btn-icon btn-icon-danger" onclick="removeCabinet(${index})" title="Remove"><i class="bi bi-trash"></i></button>
                         </div>
                     </div>
                 `;
@@ -1029,15 +1094,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             return `
             <tr>
-                <td>${partLabel}</td>
-                <td>${length}mm</td>
-                <td>${width}mm</td>
-                <td>${cut.thickness}mm</td>
-                <td>${cut.quantity}</td>
-                <td>${cut.material}</td>
-                <td style="text-align: center; font-size: 1.2em;">${grainIcon}</td>
-                <td>${totalEdgeBanding > 0 ? (totalEdgeBanding / 1000).toFixed(2) + 'm' : '-'}</td>
-                <td style="font-size: 0.85em; color: #c5c5c5;">${cut.notes || ''}</td>
+                <td data-label="Part">${partLabel}</td>
+                <td data-label="Length">${length}mm</td>
+                <td data-label="Width">${width}mm</td>
+                <td data-label="Thickness">${cut.thickness}mm</td>
+                <td data-label="Qty">${cut.quantity}</td>
+                <td data-label="Material">${cut.material}</td>
+                <td data-label="Grain" style="text-align: center; font-size: 1.2em;">${grainIcon}</td>
+                <td data-label="Edge Band">${totalEdgeBanding > 0 ? (totalEdgeBanding / 1000).toFixed(2) + 'm' : '-'}</td>
+                <td data-label="Notes" style="font-size: 0.85em; color: #c5c5c5;">${cut.notes || ''}</td>
             </tr>
         `;
         }).join('');
@@ -1103,15 +1168,15 @@ document.addEventListener('DOMContentLoaded', () => {
             
             return `
             <tr>
-                <td>${partLabel}</td>
-                <td>${length}mm</td>
-                <td>${width}mm</td>
-                <td>${cut.thickness}mm</td>
-                <td>${cut.quantity}</td>
-                <td>${cut.material}</td>
-                <td style="text-align: center; font-size: 1.2em;">${grainIcon}</td>
-                <td>${totalEdgeBanding > 0 ? (totalEdgeBanding / 1000).toFixed(2) + 'm' : '-'}</td>
-                <td style="font-size: 0.85em; color: #c5c5c5;">${cut.notes || ''}</td>
+                <td data-label="Part">${partLabel}</td>
+                <td data-label="Length">${length}mm</td>
+                <td data-label="Width">${width}mm</td>
+                <td data-label="Thickness">${cut.thickness}mm</td>
+                <td data-label="Qty">${cut.quantity}</td>
+                <td data-label="Material">${cut.material}</td>
+                <td data-label="Grain" style="text-align: center; font-size: 1.2em;">${grainIcon}</td>
+                <td data-label="Edge Band">${totalEdgeBanding > 0 ? (totalEdgeBanding / 1000).toFixed(2) + 'm' : '-'}</td>
+                <td data-label="Notes" style="font-size: 0.85em; color: #c5c5c5;">${cut.notes || ''}</td>
             </tr>
         `;
         }).join('');
@@ -1256,10 +1321,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     <span>Handles/Knobs (${quote.hardware.totalHandles} pieces)</span>
                     <span>₱${formatPrice(quote.hardware.handlesCost)}</span>
                 </div>` : ''}
-                ${parseFloat(quote.hardware.finishCost) > 0 ? `
+                ${parseFloat(quote.hardware.screwsCost) > 0 ? `
                 <div class="quote-item">
-                    <span>Finish/Paint</span>
-                    <span>₱${formatPrice(quote.hardware.finishCost)}</span>
+                    <span>Screws</span>
+                    <span>₱${formatPrice(quote.hardware.screwsCost)}</span>
                 </div>` : ''}
                 <div class="quote-item">
                     <strong>Hardware Subtotal:</strong>
@@ -1304,8 +1369,8 @@ document.addEventListener('DOMContentLoaded', () => {
     function displaySimplifiedQuote() {
         const today = new Date().toLocaleDateString();
         const projectData = {
-            clientName: document.getElementById('clientName').value || 'Valued Client',
-            projectName: document.getElementById('projectName').value || 'Custom Cabinets'
+            clientName: document.getElementById('clientName').value || 'Client 1',
+            projectName: document.getElementById('projectName').value || 'Project 1'
         };
         
         const totalUnits = cabinets.reduce((sum, c) => sum + c.quantity, 0);
@@ -1334,7 +1399,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 550: parseFloat(document.getElementById('slidePrice550').value) || 600
             },
             handlesCost: parseFloat(document.getElementById('handlesCost').value) || 0,
-            finishCost: parseFloat(document.getElementById('finishCost').value) || 0,
+            screwsCost: parseFloat(document.getElementById('screwsCost').value) || 150,
             laborHours: defaultLaborHours,
             laborRate: parseFloat(document.getElementById('laborRate').value) || 200,
             markup: parseFloat(document.getElementById('markup').value) || 70,
@@ -1447,13 +1512,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     calculateBtn.addEventListener('click', () => {
         if (cabinets.length === 0) {
-            alert('Please add at least one cabinet first!');
+            showToast('Please add at least one cabinet first.', 'warning');
             return;
         }
 
         const projectData = {
-            clientName: document.getElementById('clientName').value || 'Valued Client',
-            projectName: document.getElementById('projectName').value || 'Custom Cabinets'
+            clientName: document.getElementById('clientName').value || 'Client 1',
+            projectName: document.getElementById('projectName').value || 'Project 1'
         };
 
         const sheetCost = parseFloat(document.getElementById('sheetCost').value) || 5000;
@@ -1476,7 +1541,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 550: parseFloat(document.getElementById('slidePrice550').value) || 600
             },
             handlesCost: parseFloat(document.getElementById('handlesCost').value) || 0,
-            finishCost: parseFloat(document.getElementById('finishCost').value) || 0,
+            screwsCost: parseFloat(document.getElementById('screwsCost').value) || 150,
             laborHours: defaultLaborHours, // Use calculated default
             laborRate: parseFloat(document.getElementById('laborRate').value) || 200,
             markup: parseFloat(document.getElementById('markup').value) || 70,
@@ -1609,8 +1674,8 @@ document.addEventListener('DOMContentLoaded', () => {
             version: '1.0',
             exportDate: new Date().toISOString(),
             projectInfo: {
-                clientName: document.getElementById('clientName').value || '',
-                projectName: document.getElementById('projectName').value || 'Cabinet Project'
+                clientName: document.getElementById('clientName').value || 'Client 1',
+                projectName: document.getElementById('projectName').value || 'Project 1'
             },
             settings: {
                 sheetMaterial: document.getElementById('sheetMaterial').value,
@@ -1628,7 +1693,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     550: parseFloat(document.getElementById('slidePrice550').value) || 600
                 },
                 handlesCost: parseFloat(document.getElementById('handlesCost').value) || 0,
-                finishCost: parseFloat(document.getElementById('finishCost').value) || 0,
+                screwsCost: parseFloat(document.getElementById('screwsCost').value) || 150,
                 laborHours: parseFloat(document.getElementById('laborHours').value) || 8,
                 laborRate: parseFloat(document.getElementById('laborRate').value) || 200,
                 markup: parseFloat(document.getElementById('markup').value) || 70,
@@ -1688,7 +1753,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Validate project data
                 if (!projectData.version || !projectData.settings || !projectData.cabinets) {
-                    alert('Invalid project file format.');
+                    showToast('Invalid project file format.', 'error');
                     return;
                 }
                 
@@ -1715,7 +1780,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     document.getElementById('slidePrice550').value = settings.slidePrices[550] || 600;
                 }
                 document.getElementById('handlesCost').value = settings.handlesCost || 0;
-                document.getElementById('finishCost').value = settings.finishCost || 0;
+                document.getElementById('screwsCost').value = settings.screwsCost || settings.finishCost || 150;
                 document.getElementById('laborHours').value = settings.laborHours || 8;
                 document.getElementById('laborRate').value = settings.laborRate || 200;
                 document.getElementById('markup').value = settings.markup || 70;
@@ -1756,10 +1821,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Navigate to step 3 (Add Cabinets) to show loaded cabinets
                 goToStep(3);
                 
-                alert(`Project imported successfully!\n${cabinets.length} cabinet(s) loaded.`);
+                showToast(`Project imported successfully! ${cabinets.length} cabinet(s) loaded.`, 'success');
                 
             } catch (error) {
-                alert('Error reading project file: ' + error.message);
+                showToast('Error reading project file: ' + error.message, 'error');
             }
         };
         
@@ -1779,7 +1844,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 // Skip header row
                 if (lines.length < 2) {
-                    alert('CSV file is empty or invalid.');
+                    showToast('CSV file is empty or invalid.', 'error');
                     return;
                 }
                 
@@ -1812,7 +1877,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
                 
                 if (importedCuts.length === 0) {
-                    alert('No valid data found in CSV file.');
+                    showToast('No valid data found in CSV file.', 'error');
                     return;
                 }
                 
@@ -1827,7 +1892,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }, 3000);
                 
             } catch (error) {
-                alert('Error reading CSV file: ' + error.message);
+                showToast('Error reading CSV file: ' + error.message, 'error');
             }
         };
         
@@ -1867,11 +1932,11 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const cutListRows = cuts.map(cut => `
             <tr>
-                <td>${cut.label}</td>
-                <td>${cut.length}mm</td>
-                <td>${cut.width}mm</td>
-                <td>${cut.quantity}</td>
-                <td>${cut.material}</td>
+                <td data-label="Part">${cut.label}</td>
+                <td data-label="Length">${cut.length}mm</td>
+                <td data-label="Width">${cut.width}mm</td>
+                <td data-label="Qty">${cut.quantity}</td>
+                <td data-label="Material">${cut.material}</td>
             </tr>
         `).join('');
         
@@ -1934,7 +1999,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const hingesCost = parseFloat(document.getElementById('hingesCost').value) || 300;
         const drawerSlidesCost = parseFloat(document.getElementById('slidePrice500').value) || 550; // Default to 500mm slide price for imports
         const handlesCost = parseFloat(document.getElementById('handlesCost').value) || 0;
-        const finishCost = parseFloat(document.getElementById('finishCost').value) || 0;
+        const screwsCost = parseFloat(document.getElementById('screwsCost').value) || 150;
         const laborRate = parseFloat(document.getElementById('laborRate').value) || 200;
         const laborHoursPerCabinet = parseFloat(document.getElementById('laborHours').value) || 8;
         const markupPercent = parseFloat(document.getElementById('markup').value) || 70;
@@ -1976,9 +2041,9 @@ document.addEventListener('DOMContentLoaded', () => {
         const hingesCostTotal = doorCount * hingesCost;
         const drawerSlidesCostTotal = drawerCount * drawerSlidesCost;
         const handlesCostTotal = totalHandles * handlesCost;
-        const finishCostTotal = estimatedCabinets * finishCost;
+        const screwsCostTotal = estimatedCabinets * screwsCost;
         
-        const hardwareSubtotal = hingesCostTotal + drawerSlidesCostTotal + handlesCostTotal + finishCostTotal;
+        const hardwareSubtotal = hingesCostTotal + drawerSlidesCostTotal + handlesCostTotal + screwsCostTotal;
         
         const laborHours = estimatedCabinets * laborHoursPerCabinet;
         const laborCost = laborHours * laborRate;
@@ -2000,7 +2065,7 @@ document.addEventListener('DOMContentLoaded', () => {
             hingesCost: hingesCostTotal.toFixed(2),
             drawerSlidesCost: drawerSlidesCostTotal.toFixed(2),
             handlesCost: handlesCostTotal.toFixed(2),
-            finishCost: finishCostTotal.toFixed(2),
+            finishCost: screwsCostTotal.toFixed(2),
             hardwareSubtotal: hardwareSubtotal.toFixed(2),
             laborHours: laborHours.toFixed(1),
             laborRate,
@@ -2064,7 +2129,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>` : ''}
                 ${parseFloat(calc.finishCost) > 0 ? `
                 <div class="quote-item">
-                    <span>Finish/Paint</span>
+                    <span>Screws</span>
                     <span>₱${formatPrice(calc.finishCost)}</span>
                 </div>` : ''}
                 <div class="quote-item">
