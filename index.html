@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Pangan Cabinet Estimator</title>
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect x='10' y='10' width='80' height='80' fill='%230f172a' rx='4'/%3E%3Crect x='15' y='15' width='70' height='32' fill='%23d4af37' rx='2'/%3E%3Crect x='15' y='53' width='70' height='32' fill='%23d4af37' rx='2'/%3E%3Ccircle cx='25' cy='31' r='3' fill='%230f172a'/%3E%3Ccircle cx='25' cy='69' r='3' fill='%230f172a'/%3E%3C/svg%3E">
+    <title>Likha Studio - Cabinet Estimator</title>
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80'%3E%3Crect x='2' y='2' width='196' height='76' fill='none' stroke='%23000' stroke-width='3'/%3E%3Crect x='12' y='12' width='80' height='56' fill='%23000'/%3E%3Ctext x='52' y='48' font-family='Arial' font-size='18' font-weight='300' fill='%23fff' text-anchor='middle'%3ELIKHA%3C/text%3E%3Ctext x='140' y='48' font-family='Arial' font-size='18' font-weight='700' fill='%23000' text-anchor='middle'%3ESTUDIO%3C/text%3E%3C/svg%3E">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -18,15 +18,14 @@
             <div class="header-content">
                 <h1>
                     <span class="header-icon">
-                        <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' width='24' height='24'>
-                            <rect x='10' y='10' width='80' height='80' fill='currentColor' rx='4'/>
-                            <rect x='15' y='15' width='70' height='32' fill='#d4af37' rx='2'/>
-                            <rect x='15' y='53' width='70' height='32' fill='#d4af37' rx='2'/>
-                            <circle cx='25' cy='31' r='3' fill='currentColor'/>
-                            <circle cx='25' cy='69' r='3' fill='currentColor'/>
+                        <svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80' height='32'>
+                            <rect x='2' y='2' width='196' height='76' fill='#ffffff' stroke='#000000' stroke-width='3'/>
+                            <rect x='8' y='8' width='82' height='64' fill='#000000'/>
+                            <text x='49' y='50' font-family='Inter' font-size='20' font-weight='200' fill='#ffffff' text-anchor='middle' letter-spacing='3'>LIKHA</text>
+                            <text x='142' y='50' font-family='Inter' font-size='20' font-weight='800' fill='#000000' text-anchor='middle' letter-spacing='1'>STUDIO</text>
                         </svg>
                     </span>
-                    Pangan Cabinet Estimator
+                    Cabinet Estimator
                 </h1>
                 <p>Professional cabinet estimation and quotation system</p>
             </div>
@@ -65,26 +64,28 @@
             </div>
             <div class="form-section">
                 <h2>Project Details</h2>
-                <div class="form-group">
-                    <label for="clientName">Client Name:</label>
-                    <input type="text" id="clientName" placeholder="Enter client name">
-                </div>
-                <div class="form-group">
-                    <label for="projectName">Project Name:</label>
-                    <input type="text" id="projectName" list="projectSuggestions" placeholder="e.g., Kitchen Renovation">
-                    <datalist id="projectSuggestions">
-                        <option value="Kitchen Renovation">
-                        <option value="Complete Kitchen Remodel">
-                        <option value="New Kitchen Installation">
-                        <option value="Kitchen Cabinet Upgrade">
-                        <option value="Modular Kitchen Setup">
-                        <option value="Pantry Cabinet Installation">
-                        <option value="Kitchen Storage Solution">
-                        <option value="Custom Kitchen Cabinets">
-                        <option value="Office Cabinet Installation">
-                        <option value="Bedroom Wardrobe">
-                    </datalist>
-                    <small style="color: #666; display: block; margin-top: 5px;">Start typing or click to see suggestions</small>
+                <div class="dimensions-grid" style="grid-template-columns: 1fr 1fr;">
+                    <div class="form-group">
+                        <label for="clientName">Client Name:</label>
+                        <input type="text" id="clientName" placeholder="Enter client name">
+                    </div>
+                    <div class="form-group">
+                        <label for="projectName">Project Name:</label>
+                        <input type="text" id="projectName" list="projectSuggestions" placeholder="e.g., Kitchen Renovation">
+                        <datalist id="projectSuggestions">
+                            <option value="Kitchen Renovation">
+                            <option value="Complete Kitchen Remodel">
+                            <option value="New Kitchen Installation">
+                            <option value="Kitchen Cabinet Upgrade">
+                            <option value="Modular Kitchen Setup">
+                            <option value="Pantry Cabinet Installation">
+                            <option value="Kitchen Storage Solution">
+                            <option value="Custom Kitchen Cabinets">
+                            <option value="Office Cabinet Installation">
+                            <option value="Bedroom Wardrobe">
+                        </datalist>
+                        <small style="color: var(--text-tertiary, #9a9a9a); display: block; margin-top: 5px;">Start typing or click to see suggestions</small>
+                    </div>
                 </div>
             </div>
             <div class="step-navigation">
@@ -148,16 +149,41 @@
                             <input type="number" id="hingesCost" value="300" step="0.01">
                         </div>
                         <div class="form-group compact">
-                            <label for="drawerSlidesCost">Slides (₱/drawer):</label>
-                            <input type="number" id="drawerSlidesCost" value="600" step="0.01">
-                        </div>
-                        <div class="form-group compact">
                             <label for="handlesCost">Handles (₱/ea):</label>
                             <input type="number" id="handlesCost" value="0" step="0.01">
                         </div>
                         <div class="form-group compact">
                             <label for="finishCost">Finish (₱/cabinet):</label>
                             <input type="number" id="finishCost" value="0" step="0.01">
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px;">
+                        <label style="font-size: 0.88em; font-weight: 500; display: block; margin-bottom: 10px;">Drawer Slide Prices (₱/pair):</label>
+                        <div style="display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px;">
+                            <div class="form-group compact">
+                                <label for="slidePrice300">300mm:</label>
+                                <input type="number" id="slidePrice300" value="350" step="1">
+                            </div>
+                            <div class="form-group compact">
+                                <label for="slidePrice350">350mm:</label>
+                                <input type="number" id="slidePrice350" value="400" step="1">
+                            </div>
+                            <div class="form-group compact">
+                                <label for="slidePrice400">400mm:</label>
+                                <input type="number" id="slidePrice400" value="450" step="1">
+                            </div>
+                            <div class="form-group compact">
+                                <label for="slidePrice450">450mm:</label>
+                                <input type="number" id="slidePrice450" value="500" step="1">
+                            </div>
+                            <div class="form-group compact">
+                                <label for="slidePrice500">500mm:</label>
+                                <input type="number" id="slidePrice500" value="550" step="1">
+                            </div>
+                            <div class="form-group compact">
+                                <label for="slidePrice550">550mm:</label>
+                                <input type="number" id="slidePrice550" value="600" step="1">
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -179,10 +205,10 @@
                         </div>
                         <div class="form-group compact">
                             <label for="overhead">Overhead (₱):</label>
-                            <input type="number" id="overhead" value="0" step="1" min="0">
+                            <input type="number" id="overhead" value="5000" step="1" min="0">
                         </div>
                     </div>
-                    <div style="margin-top: 10px; padding: 10px; background: #fff3cd; border-radius: 6px; font-size: 0.85em;">
+                    <div style="margin-top: 10px; padding: 10px; background: rgba(212, 175, 55, 0.15); border-radius: 6px; font-size: 0.85em; color: #e5c158; border: 1px solid rgba(212, 175, 55, 0.3);">
                         <strong>Formula:</strong> Total = (Materials + Labor) × (1 + Markup%) + Overhead
                     </div>
                 </div>
@@ -199,95 +225,103 @@
                 <button class="btn-secondary" onclick="goToStep(2)">← Back</button>
                 <button class="btn-primary" id="proceedToReviewBtnTop" onclick="proceedToReview()">Next: Review & Generate Quote →</button>
             </div>
-            <div class="form-section">
-                <h2>Cabinet Details</h2>
-                <div class="form-group">
-                    <label for="cabinetName">Cabinet Name/Description:</label>
-                    <input type="text" id="cabinetName" placeholder="e.g., Base Cabinet - Sink">
-                </div>
-                <div class="form-group">
-                    <label for="cabinetGroup">Group/Location:</label>
-                    <input type="text" id="cabinetGroup" list="groupSuggestions" placeholder="e.g., Kitchen, Bedroom, Lavatory">
-                    <datalist id="groupSuggestions">
-                        <option value="Kitchen">
-                        <option value="Bedroom">
-                        <option value="Lavatory">
-                        <option value="Bathroom">
-                        <option value="Living Room">
-                        <option value="Dining Room">
-                        <option value="Office">
-                        <option value="Laundry">
-                        <option value="Pantry">
-                        <option value="Garage">
-                    </datalist>
-                    <small style="color: #666; display: block; margin-top: 5px;">Group cabinets by room or location</small>
-                </div>
-                <div class="dimensions-grid">
-                    <div class="form-group">
-                        <label for="quantity">Quantity:</label>
+            <div class="form-section" style="padding: 16px;">
+                <h2 style="margin-bottom: 12px;">Add Cabinet</h2>
+                <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px;">
+                    <div class="form-group compact">
+                        <label for="cabinetName">Name:</label>
+                        <input type="text" id="cabinetName" placeholder="e.g., Base Cabinet - Sink">
+                    </div>
+                    <div class="form-group compact">
+                        <label for="cabinetGroup">Group:</label>
+                        <input type="text" id="cabinetGroup" list="groupSuggestions" placeholder="e.g., Kitchen">
+                        <datalist id="groupSuggestions">
+                            <option value="Kitchen">
+                            <option value="Bedroom">
+                            <option value="Lavatory">
+                            <option value="Bathroom">
+                            <option value="Living Room">
+                            <option value="Office">
+                            <option value="Pantry">
+                        </datalist>
+                    </div>
+                    <div class="form-group compact">
+                        <label for="quantity">Qty:</label>
                         <input type="number" id="quantity" value="1" min="1">
                     </div>
-                    <div class="form-group">
-                        <label for="cabinetType">Cabinet Type:</label>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+                    <div class="form-group compact">
+                        <label for="cabinetType">Type:</label>
                         <select id="cabinetType">
-                            <option value="base">Base Cabinet</option>
-                            <option value="wall">Wall Cabinet</option>
-                            <option value="tall">Tall Cabinet</option>
+                            <option value="base">Base</option>
+                            <option value="wall">Wall</option>
+                            <option value="tall">Tall</option>
                             <option value="custom">Custom</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="preSize">Pre-defined Size:</label>
+                    <div class="form-group compact">
+                        <label for="preSize">Size:</label>
                         <select id="preSize">
-                            <option value="">Select a standard size...</option>
+                            <option value="">Standard...</option>
                         </select>
                     </div>
-                </div>
-                <div class="dimensions-grid">
-                    <div class="form-group">
-                        <label for="width">Width (cm):</label>
+                    <div class="form-group compact">
+                        <label for="width">W (cm):</label>
                         <input type="number" id="width" placeholder="90" step="0.1">
                     </div>
-                    <div class="form-group">
-                        <label for="height">Height (cm):</label>
+                    <div class="form-group compact">
+                        <label for="height">H (cm):</label>
                         <input type="number" id="height" placeholder="75" step="0.1">
                     </div>
-                    <div class="form-group">
-                        <label for="depth">Depth (cm):</label>
+                    <div class="form-group compact">
+                        <label for="depth">D (cm):</label>
                         <input type="number" id="depth" placeholder="60" step="0.1">
                     </div>
+                    <div class="form-group compact">
+                        <label for="numDoors">Doors:</label>
+                        <input type="number" id="numDoors" value="2" min="0">
+                    </div>
                 </div>
-            </div>
-
-            <div class="form-section">
-                <h2>Cabinet Configuration</h2>
-                <div class="form-group">
-                    <label for="numDoors">Number of Doors:</label>
-                    <input type="number" id="numDoors" value="2" min="0">
+                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 3fr; gap: 10px; margin-top: 10px;">
+                    <div class="form-group compact">
+                        <label for="numDrawers">Drawers:</label>
+                        <input type="number" id="numDrawers" value="0" min="0">
+                    </div>
+                    <div class="form-group compact">
+                        <label for="numShelves">Shelves:</label>
+                        <input type="number" id="numShelves" value="1" min="0">
+                    </div>
+                    <div class="form-group compact">
+                        <label for="numVerticalDividers">Dividers:</label>
+                        <input type="number" id="numVerticalDividers" value="0" min="0" max="10">
+                    </div>
+                    <div></div>
                 </div>
-                <div class="form-group">
-                    <label for="numDrawers">Number of Drawers:</label>
-                    <input type="number" id="numDrawers" value="0" min="0">
-                </div>
-                <div id="drawerSizesContainer" style="display: none; margin-top: 15px; padding: 15px; background: #f0f0f0; border-radius: 6px;">
-                    <h4 style="margin-bottom: 10px; color: #667eea;">Drawer Heights (cm)</h4>
+                <div id="drawerSizesContainer" style="display: none; margin-top: 10px; padding: 12px; background: var(--bg-subtle, #2a2a2a); border-radius: 6px; border: 1px solid var(--border-default, rgba(255,255,255,0.07));">
+                    <div style="display: flex; align-items: center; gap: 16px; margin-bottom: 10px;">
+                        <span style="color: var(--accent, #d4af37); font-weight: 500; font-size: 0.9em;">Drawer Config</span>
+                        <div class="form-group compact" style="margin: 0;">
+                            <label for="drawerSlideLength">Slide:</label>
+                            <select id="drawerSlideLength">
+                                <option value="300">300mm</option>
+                                <option value="350">350mm</option>
+                                <option value="400">400mm</option>
+                                <option value="450">450mm</option>
+                                <option value="500" selected>500mm</option>
+                                <option value="550">550mm</option>
+                            </select>
+                        </div>
+                    </div>
                     <div id="drawerSizesInputs"></div>
                 </div>
-                <div class="form-group">
-                    <label for="numShelves">Number of Shelves:</label>
-                    <input type="number" id="numShelves" value="1" min="0">
-                </div>
-                <div class="form-group">
-                    <label for="numVerticalDividers">Vertical Dividers:</label>
-                    <input type="number" id="numVerticalDividers" value="0" min="0" max="10">
-                </div>
             </div>
 
-            <div class="button-group">
-                <button id="addCabinetBtn" class="btn-primary">Add Cabinet to List</button>
+            <div class="button-group" style="margin-top: 10px;">
+                <button id="addCabinetBtn" class="btn-primary">Add Cabinet</button>
                 <button id="updateCabinetBtn" class="btn-primary" style="display: none;">Update Cabinet</button>
                 <button id="cancelEditBtn" class="btn-secondary" style="display: none;">Cancel Edit</button>
-                <button id="resetCurrentBtn" class="btn-secondary">Clear Form</button>
+                <button id="resetCurrentBtn" class="btn-secondary">Clear</button>
             </div>
 
             <div id="cabinetList" class="cabinet-list-section" style="display: none;">

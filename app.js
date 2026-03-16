@@ -12,6 +12,7 @@ class Cabinet {
         this.numDoors = data.numDoors;
         this.numDrawers = data.numDrawers;
         this.drawerHeights = data.drawerHeights || [];
+        this.drawerSlideLength = data.drawerSlideLength || 500;
         this.numShelves = data.numShelves;
         this.numVerticalDividers = data.numVerticalDividers || 0;
         this.sheetMaterial = data.sheetMaterial;
@@ -180,7 +181,7 @@ class Cabinet {
 
         // 7. DRAWER COMPONENTS (if drawers exist)
         if (this.numDrawers > 0) {
-            const drawerBoxDepth = this.depth - 50; // Allow 50mm for slides
+            const drawerBoxDepth = this.drawerSlideLength; // Use selected slide length
             const drawerBoxWidth = this.width - (2 * t) - 6; // Fit inside cabinet with clearance
 
             // Use custom drawer heights if provided, otherwise calculate evenly
@@ -354,6 +355,7 @@ class CabinetCalculator {
         let totalDoors = 0;
         let totalDrawers = 0;
         let totalHandles = 0;
+        let totalDrawerSlidesCost = 0;
 
         // Calculate totals from all cabinets using actual cut lists
         cabinets.forEach(cabinet => {
@@ -377,6 +379,12 @@ class CabinetCalculator {
             totalDoors += cabinet.numDoors * cabinet.quantity;
             totalDrawers += cabinet.numDrawers * cabinet.quantity;
             totalHandles += (cabinet.numDoors + cabinet.numDrawers) * cabinet.quantity;
+            
+            // Calculate drawer slide cost based on slide length
+            if (cabinet.numDrawers > 0) {
+                const slidePrice = pricing.slidePrices[cabinet.drawerSlideLength] || pricing.slidePrices[500] || 550;
+                totalDrawerSlidesCost += slidePrice * cabinet.numDrawers * cabinet.quantity;
+            }
         });
 
         // Labor hours is already calculated as total units * 8 hours per unit
@@ -390,7 +398,7 @@ class CabinetCalculator {
         
         // Hardware costs
         const hingesCost = totalDoors * pricing.hingesCost;
-        const drawerSlidesCost = totalDrawers * pricing.drawerSlidesCost;
+        const drawerSlidesCost = totalDrawerSlidesCost;
         const handlesCost = totalHandles * pricing.handlesCost;
         const finishCost = pricing.finishCost * cabinets.reduce((sum, c) => sum + c.quantity, 0);
         
@@ -565,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="cabinet-item-info">
                             <h4>${cabinet.name} (x${cabinet.quantity})</h4>
                             <p>${(cabinet.width/10).toFixed(1)}cm × ${(cabinet.height/10).toFixed(1)}cm × ${(cabinet.depth/10).toFixed(1)}cm</p>
-                            <p>${cabinet.numDoors} doors, ${cabinet.numDrawers} drawers${cabinet.drawerHeights.length > 0 ? ` (${cabinet.drawerHeights.map(h => (h/10).toFixed(1)).join('cm, ')}cm)` : ''}, ${cabinet.numShelves} shelves${cabinet.numVerticalDividers > 0 ? `, ${cabinet.numVerticalDividers} dividers` : ''}</p>
+                            <p>${cabinet.numDoors} doors, ${cabinet.numDrawers} drawers${cabinet.numDrawers > 0 ? ` (${cabinet.drawerSlideLength}mm slides)` : ''}${cabinet.drawerHeights.length > 0 ? ` (${cabinet.drawerHeights.map(h => (h/10).toFixed(1)).join('cm, ')}cm)` : ''}, ${cabinet.numShelves} shelves${cabinet.numVerticalDividers > 0 ? `, ${cabinet.numVerticalDividers} dividers` : ''}</p>
                         </div>
                         <button class="btn-remove" onclick="removeCabinetFromReview(${index})">Remove</button>
                     </div>
@@ -686,6 +694,9 @@ document.addEventListener('DOMContentLoaded', () => {
             // Standard: 1 divider for every 40cm of width (rounded down), max based on width
             const numDividers = size.width >= 80 ? Math.floor(size.width / 40) - 1 : 0;
             document.getElementById('numVerticalDividers').value = numDividers;
+            
+            // Auto-select best drawer slide length for this depth
+            updateDrawerSlideLength();
         }
     });
 
@@ -706,22 +717,93 @@ document.addEventListener('DOMContentLoaded', () => {
         preSizeSelect.disabled = cabinetType === 'custom';
     }
 
+    // Auto-select drawer slide length based on cabinet depth
+    function updateDrawerSlideLength() {
+        const depthCm = parseFloat(document.getElementById('depth').value) || 0;
+        const depthMm = depthCm * 10;
+        // Available slide lengths
+        const slideLengths = [300, 350, 400, 450, 500, 550];
+        // Pick the largest slide that fits (depth minus ~50mm clearance for back panel and front)
+        const maxSlide = depthMm - 50;
+        let bestFit = slideLengths[0];
+        for (const len of slideLengths) {
+            if (len <= maxSlide) {
+                bestFit = len;
+            }
+        }
+        document.getElementById('drawerSlideLength').value = bestFit;
+    }
+
+    // Listen for depth changes
+    document.getElementById('depth').addEventListener('change', updateDrawerSlideLength);
+    document.getElementById('depth').addEventListener('input', updateDrawerSlideLength);
+
     // Initialize pre-size options on load
     updatePreSizeOptions();
 
     // Handle drawer count changes
     numDrawersInput.addEventListener('change', () => {
         const numDrawers = parseInt(numDrawersInput.value) || 0;
+        const heightCm = parseFloat(document.getElementById('height').value) || 75;
+        const maxDrawers = Math.floor(heightCm / 10); // Minimum ~10cm per drawer
+        
+        if (numDrawers > maxDrawers && heightCm > 0) {
+            alert(`Maximum recommended drawers for ${heightCm}cm height is ${maxDrawers}. You entered ${numDrawers}.`);
+        }
+        
         if (numDrawers > 0) {
             drawerSizesContainer.style.display = 'block';
             updateDrawerSizeInputs(numDrawers);
+            validateDrawerHeights();
         } else {
             drawerSizesContainer.style.display = 'none';
+            const oldWarning = document.getElementById('drawerWarning');
+            if (oldWarning) oldWarning.remove();
         }
     });
 
+    function validateDrawerHeights() {
+        const heightCm = parseFloat(document.getElementById('height').value) || 0;
+        const heightMm = heightCm * 10;
+        const numDrawers = parseInt(numDrawersInput.value) || 0;
+        
+        if (numDrawers === 0 || heightMm === 0) return;
+        
+        // Calculate total drawer height from inputs
+        let totalDrawerHeight = 0;
+        for (let i = 0; i < numDrawers; i++) {
+            const input = document.getElementById(`drawer${i}Height`);
+            const h = input ? (parseFloat(input.value) || 15) * 10 : 150; // cm to mm
+            totalDrawerHeight += h;
+        }
+        
+        const warningEl = document.getElementById('drawerWarning');
+        
+        if (totalDrawerHeight > heightMm) {
+            if (!warningEl) {
+                const warning = document.createElement('div');
+                warning.id = 'drawerWarning';
+                warning.style.cssText = 'margin-top: 10px; padding: 10px; background: rgba(212, 175, 55, 0.15); border-radius: 6px; color: #e5c158; font-size: 0.85em; border-left: 4px solid #d4af37;';
+                warning.innerHTML = `<strong>Warning:</strong> Total drawer height (${(totalDrawerHeight/10).toFixed(1)}cm) exceeds cabinet height (${heightCm}cm). Reduce drawer count or heights.`;
+                drawerSizesInputs.parentNode.appendChild(warning);
+            } else {
+                warningEl.innerHTML = `<strong>Warning:</strong> Total drawer height (${(totalDrawerHeight/10).toFixed(1)}cm) exceeds cabinet height (${heightCm}cm). Reduce drawer count or heights.`;
+            }
+        } else {
+            if (warningEl) warningEl.remove();
+        }
+    }
+
+    // Re-validate when height changes
+    document.getElementById('height').addEventListener('change', validateDrawerHeights);
+    document.getElementById('height').addEventListener('input', validateDrawerHeights);
+
     function updateDrawerSizeInputs(count) {
         drawerSizesInputs.innerHTML = '';
+        // Remove old warning if any
+        const oldWarning = document.getElementById('drawerWarning');
+        if (oldWarning) oldWarning.remove();
+        
         for (let i = 0; i < count; i++) {
             const div = document.createElement('div');
             div.className = 'form-group';
@@ -731,7 +813,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 <input type="number" id="drawer${i}Height" class="drawer-height-input" placeholder="15" step="0.1" min="5" value="15">
             `;
             drawerSizesInputs.appendChild(div);
+            
+            // Add validation listener
+            const input = div.querySelector('input');
+            input.addEventListener('change', validateDrawerHeights);
+            input.addEventListener('input', validateDrawerHeights);
         }
+        
+        validateDrawerHeights();
     }
 
     function getCabinetData() {
@@ -764,6 +853,7 @@ document.addEventListener('DOMContentLoaded', () => {
             drawerHeights: drawerHeights,
             numShelves: parseInt(document.getElementById('numShelves').value) || 0,
             numVerticalDividers: parseInt(document.getElementById('numVerticalDividers').value) || 0,
+            drawerSlideLength: parseInt(document.getElementById('drawerSlideLength').value) || 500,
             sheetMaterial: fullMaterialName,
             thickness: thickness,
             kerf: parseFloat(document.getElementById('kerf').value) || 3,
@@ -786,6 +876,7 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('numVerticalDividers').value = '0';
         drawerSizesContainer.style.display = 'none';
         drawerSizesInputs.innerHTML = '';
+        document.getElementById('drawerSlideLength').value = '500';
         updatePreSizeOptions();
         
         // Reset edit mode
@@ -826,7 +917,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <div class="cabinet-item-info">
                             <h4>${cabinet.name} (x${cabinet.quantity})</h4>
                             <p>${(cabinet.width/10).toFixed(1)}cm × ${(cabinet.height/10).toFixed(1)}cm × ${(cabinet.depth/10).toFixed(1)}cm</p>
-                            <p>${cabinet.numDoors} doors, ${cabinet.numDrawers} drawers${cabinet.drawerHeights.length > 0 ? ` (${cabinet.drawerHeights.map(h => (h/10).toFixed(1)).join('cm, ')}cm)` : ''}, ${cabinet.numShelves} shelves${cabinet.numVerticalDividers > 0 ? `, ${cabinet.numVerticalDividers} dividers` : ''}</p>
+                            <p>${cabinet.numDoors} doors, ${cabinet.numDrawers} drawers${cabinet.numDrawers > 0 ? ` (${cabinet.drawerSlideLength}mm slides)` : ''}${cabinet.drawerHeights.length > 0 ? ` (${cabinet.drawerHeights.map(h => (h/10).toFixed(1)).join('cm, ')}cm)` : ''}, ${cabinet.numShelves} shelves${cabinet.numVerticalDividers > 0 ? `, ${cabinet.numVerticalDividers} dividers` : ''}</p>
                         </div>
                         <div style="display: flex; gap: 10px;">
                             <button class="btn-secondary" onclick="editCabinet(${index})" style="padding: 10px 20px;">Edit</button>
@@ -879,6 +970,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (cabinet.numDrawers > 0) {
             updateDrawerSizeInputs(cabinet.numDrawers);
             drawerSizesContainer.style.display = 'block';
+            document.getElementById('drawerSlideLength').value = cabinet.drawerSlideLength || 500;
             cabinet.drawerHeights.forEach((height, i) => {
                 const input = document.getElementById(`drawer${i}Height`);
                 if (input) {
@@ -928,23 +1020,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 (cut.edgeBanding.front + cut.edgeBanding.back + cut.edgeBanding.left + cut.edgeBanding.right) : 0;
             const grainIcon = cut.grain === 'vertical' ? '↕' : cut.grain === 'horizontal' ? '↔' : '-';
             
-            // For cut list display: Length (along grain) x Width (across grain)
-            // Vertical grain: height is length, width is width
-            // Horizontal grain: width is length, height is width
-            let length, width;
-            if (cut.grain === 'vertical') {
-                length = cut.height;
-                width = cut.width;
-            } else if (cut.grain === 'horizontal') {
-                length = cut.width;
-                width = cut.height;
-            } else {
-                // No grain direction
-                length = cut.width;
-                width = cut.height;
-            }
+            // Length is always the larger dimension, Width is the smaller
+            // Grain icon indicates how the piece is oriented on the sheet
+            let length = Math.max(cut.width, cut.height);
+            let width = Math.min(cut.width, cut.height);
             
-            // Display as "Cabinet Name - Part"
             const partLabel = `${cut.cabinetName} - ${cut.part}`;
             
             return `
@@ -957,7 +1037,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${cut.material}</td>
                 <td style="text-align: center; font-size: 1.2em;">${grainIcon}</td>
                 <td>${totalEdgeBanding > 0 ? (totalEdgeBanding / 1000).toFixed(2) + 'm' : '-'}</td>
-                <td style="font-size: 0.85em; color: #666;">${cut.notes || ''}</td>
+                <td style="font-size: 0.85em; color: #c5c5c5;">${cut.notes || ''}</td>
             </tr>
         `;
         }).join('');
@@ -1015,20 +1095,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 (cut.edgeBanding.front + cut.edgeBanding.back + cut.edgeBanding.left + cut.edgeBanding.right) : 0;
             const grainIcon = cut.grain === 'vertical' ? '↕' : cut.grain === 'horizontal' ? '↔' : '-';
             
-            // For cut list display: Length (along grain) x Width (across grain)
-            let length, width;
-            if (cut.grain === 'vertical') {
-                length = cut.height;
-                width = cut.width;
-            } else if (cut.grain === 'horizontal') {
-                length = cut.width;
-                width = cut.height;
-            } else {
-                length = cut.width;
-                width = cut.height;
-            }
+            // Length is always the larger dimension, Width is the smaller
+            let length = Math.max(cut.width, cut.height);
+            let width = Math.min(cut.width, cut.height);
             
-            // Display as "Cabinet Name - Part"
             const partLabel = `${cut.cabinetName} - ${cut.part}`;
             
             return `
@@ -1041,7 +1111,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td>${cut.material}</td>
                 <td style="text-align: center; font-size: 1.2em;">${grainIcon}</td>
                 <td>${totalEdgeBanding > 0 ? (totalEdgeBanding / 1000).toFixed(2) + 'm' : '-'}</td>
-                <td style="font-size: 0.85em; color: #666;">${cut.notes || ''}</td>
+                <td style="font-size: 0.85em; color: #c5c5c5;">${cut.notes || ''}</td>
             </tr>
         `;
         }).join('');
@@ -1073,26 +1143,26 @@ document.addEventListener('DOMContentLoaded', () => {
                         ${cutListRows}
                     </tbody>
                 </table>
-                <div style="margin-top: 15px; padding: 15px; background: #e8f5e9; border-radius: 6px;">
-                    <strong>Grain Direction Legend:</strong>
-                    <ul style="margin: 10px 0 0 20px; color: #666;">
+                <div style="margin-top: 15px; padding: 15px; background: rgba(108, 203, 95, 0.1); border-radius: 6px; border: 1px solid rgba(108, 203, 95, 0.2);">
+                    <strong style="color: #6ccb5f;">Grain Direction Legend:</strong>
+                    <ul style="margin: 10px 0 0 20px; color: #c5c5c5;">
                         <li>↕ = Vertical grain (grain runs along length/height)</li>
                         <li>↔ = Horizontal grain (grain runs along length/width)</li>
                         <li>- = No grain direction (back panels, drawer bottoms)</li>
                     </ul>
-                    <p style="margin-top: 10px; color: #666;"><strong>Cut List Format:</strong> Length × Width × Thickness</p>
-                    <p style="color: #666;">Length is the dimension along the grain direction. Width is across the grain.</p>
-                    <p style="margin-top: 10px; color: #666;"><strong>Note:</strong> Kerf (saw blade thickness) of ${cabinets[0]?.kerf || 3}mm is accounted for in cutting diagram spacing.</p>
+                    <p style="margin-top: 10px; color: #c5c5c5;"><strong>Cut List Format:</strong> Length × Width × Thickness</p>
+                    <p style="color: #c5c5c5;">Length is the dimension along the grain direction. Width is across the grain.</p>
+                    <p style="margin-top: 10px; color: #c5c5c5;"><strong>Note:</strong> Kerf (saw blade thickness) of ${cabinets[0]?.kerf || 3}mm is accounted for in cutting diagram spacing.</p>
                 </div>
             </div>
 
             <div class="cutting-diagram-section">
                 <h3>Sheet Cutting Diagram</h3>
-                <p style="margin-bottom: 15px; color: #666;">Visual layout for cutting ${sheetMaterialName} sheets (1220mm × 2440mm)</p>
+                <p style="margin-bottom: 15px; color: #9a9a9a;">Visual layout for cutting ${sheetMaterialName} sheets (1220mm × 2440mm)</p>
                 <div id="cuttingDiagram"></div>
-                <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 6px; border-left: 4px solid #ffc107;">
-                    <strong>Tips:</strong>
-                    <ul style="margin: 10px 0 0 20px; color: #666;">
+                <div style="margin-top: 15px; padding: 15px; background: rgba(212, 175, 55, 0.1); border-radius: 6px; border-left: 4px solid #d4af37;">
+                    <strong style="color: #e5c158;">Tips:</strong>
+                    <ul style="margin: 10px 0 0 20px; color: #c5c5c5;">
                         <li>Each colored rectangle represents a part to cut</li>
                         <li>Dimensions shown are width × height in mm</li>
                         <li>Allow 3-5mm kerf (saw blade width) between cuts</li>
@@ -1255,7 +1325,14 @@ document.addEventListener('DOMContentLoaded', () => {
             sheetCost: sheetCost,
             edgeBanding: parseFloat(document.getElementById('edgeBanding').value) || 50,
             hingesCost: parseFloat(document.getElementById('hingesCost').value) || 300,
-            drawerSlidesCost: parseFloat(document.getElementById('drawerSlidesCost').value) || 600,
+            slidePrices: {
+                300: parseFloat(document.getElementById('slidePrice300').value) || 350,
+                350: parseFloat(document.getElementById('slidePrice350').value) || 400,
+                400: parseFloat(document.getElementById('slidePrice400').value) || 450,
+                450: parseFloat(document.getElementById('slidePrice450').value) || 500,
+                500: parseFloat(document.getElementById('slidePrice500').value) || 550,
+                550: parseFloat(document.getElementById('slidePrice550').value) || 600
+            },
             handlesCost: parseFloat(document.getElementById('handlesCost').value) || 0,
             finishCost: parseFloat(document.getElementById('finishCost').value) || 0,
             laborHours: defaultLaborHours,
@@ -1324,9 +1401,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>
             </div>
 
-            <div style="margin-top: 30px; padding: 20px; background: #f8fafc; border-radius: 12px; border-left: 4px solid var(--accent);">
-                <h4 style="margin-bottom: 15px; color: var(--dark);">What's Included:</h4>
-                <ul style="margin: 0 0 0 20px; color: #666; line-height: 1.8;">
+            <div style="margin-top: 30px; padding: 20px; background: rgba(212, 175, 55, 0.1); border-radius: 12px; border-left: 4px solid var(--accent);">
+                <h4 style="margin-bottom: 15px; color: var(--text-primary, #e0e0e0);">What's Included:</h4>
+                <ul style="margin: 0 0 0 20px; color: var(--text-secondary, #c5c5c5); line-height: 1.8;">
                     <li>All materials (${fullMaterialName}, edge banding)</li>
                     <li>Hardware (hinges, drawer slides, handles)</li>
                     <li>Professional installation and finishing</li>
@@ -1334,11 +1411,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 </ul>
             </div>
 
-            <div style="margin-top: 20px; padding: 15px; background: #fff3cd; border-radius: 8px; font-size: 0.9em; color: #856404;">
+            <div style="margin-top: 20px; padding: 15px; background: rgba(212, 175, 55, 0.15); border-radius: 8px; font-size: 0.9em; color: #e5c158; border: 1px solid rgba(212, 175, 55, 0.3);">
                 <p style="margin: 0;"><strong>Note:</strong> This quotation is valid for 30 days from the date above. Material costs are subject to change based on availability. A 50% deposit is required to begin work.</p>
             </div>
 
-            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border); text-align: center; color: #666;">
+            <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid var(--border-default, rgba(255,255,255,0.08)); text-align: center; color: var(--text-secondary, #c5c5c5);">
                 <p style="margin: 5px 0;">Thank you for choosing our services!</p>
                 <p style="margin: 5px 0; font-size: 0.9em;">For questions or concerns, please contact us.</p>
             </div>
@@ -1390,7 +1467,14 @@ document.addEventListener('DOMContentLoaded', () => {
             sheetCost: sheetCost,
             edgeBanding: parseFloat(document.getElementById('edgeBanding').value) || 50,
             hingesCost: parseFloat(document.getElementById('hingesCost').value) || 300,
-            drawerSlidesCost: parseFloat(document.getElementById('drawerSlidesCost').value) || 600,
+            slidePrices: {
+                300: parseFloat(document.getElementById('slidePrice300').value) || 350,
+                350: parseFloat(document.getElementById('slidePrice350').value) || 400,
+                400: parseFloat(document.getElementById('slidePrice400').value) || 450,
+                450: parseFloat(document.getElementById('slidePrice450').value) || 500,
+                500: parseFloat(document.getElementById('slidePrice500').value) || 550,
+                550: parseFloat(document.getElementById('slidePrice550').value) || 600
+            },
             handlesCost: parseFloat(document.getElementById('handlesCost').value) || 0,
             finishCost: parseFloat(document.getElementById('finishCost').value) || 0,
             laborHours: defaultLaborHours, // Use calculated default
@@ -1535,7 +1619,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 grainOrientation: document.getElementById('grainOrientation').value || 'horizontal',
                 edgeBanding: parseFloat(document.getElementById('edgeBanding').value) || 50,
                 hingesCost: parseFloat(document.getElementById('hingesCost').value) || 300,
-                drawerSlidesCost: parseFloat(document.getElementById('drawerSlidesCost').value) || 600,
+                slidePrices: {
+                    300: parseFloat(document.getElementById('slidePrice300').value) || 350,
+                    350: parseFloat(document.getElementById('slidePrice350').value) || 400,
+                    400: parseFloat(document.getElementById('slidePrice400').value) || 450,
+                    450: parseFloat(document.getElementById('slidePrice450').value) || 500,
+                    500: parseFloat(document.getElementById('slidePrice500').value) || 550,
+                    550: parseFloat(document.getElementById('slidePrice550').value) || 600
+                },
                 handlesCost: parseFloat(document.getElementById('handlesCost').value) || 0,
                 finishCost: parseFloat(document.getElementById('finishCost').value) || 0,
                 laborHours: parseFloat(document.getElementById('laborHours').value) || 8,
@@ -1555,6 +1646,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 numDoors: cabinet.numDoors,
                 numDrawers: cabinet.numDrawers,
                 drawerHeights: cabinet.drawerHeights,
+                drawerSlideLength: cabinet.drawerSlideLength,
                 numShelves: cabinet.numShelves,
                 numVerticalDividers: cabinet.numVerticalDividers
             }))
@@ -1614,7 +1706,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 document.getElementById('grainOrientation').value = settings.grainOrientation || 'horizontal';
                 document.getElementById('edgeBanding').value = settings.edgeBanding || 50;
                 document.getElementById('hingesCost').value = settings.hingesCost || 300;
-                document.getElementById('drawerSlidesCost').value = settings.drawerSlidesCost || 600;
+                if (settings.slidePrices) {
+                    document.getElementById('slidePrice300').value = settings.slidePrices[300] || 350;
+                    document.getElementById('slidePrice350').value = settings.slidePrices[350] || 400;
+                    document.getElementById('slidePrice400').value = settings.slidePrices[400] || 450;
+                    document.getElementById('slidePrice450').value = settings.slidePrices[450] || 500;
+                    document.getElementById('slidePrice500').value = settings.slidePrices[500] || 550;
+                    document.getElementById('slidePrice550').value = settings.slidePrices[550] || 600;
+                }
                 document.getElementById('handlesCost').value = settings.handlesCost || 0;
                 document.getElementById('finishCost').value = settings.finishCost || 0;
                 document.getElementById('laborHours').value = settings.laborHours || 8;
@@ -1637,6 +1736,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         numDoors: cabinetData.numDoors,
                         numDrawers: cabinetData.numDrawers,
                         drawerHeights: cabinetData.drawerHeights || [],
+                        drawerSlideLength: cabinetData.drawerSlideLength || 500,
                         numShelves: cabinetData.numShelves,
                         numVerticalDividers: cabinetData.numVerticalDividers || 0,
                         sheetMaterial: `${settings.sheetThickness}mm ${settings.sheetMaterial}`,
@@ -1832,7 +1932,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const sheetCost = parseFloat(document.getElementById('sheetCost').value) || 5000;
         const edgeBandingCostPerMeter = parseFloat(document.getElementById('edgeBanding').value) || 50;
         const hingesCost = parseFloat(document.getElementById('hingesCost').value) || 300;
-        const drawerSlidesCost = parseFloat(document.getElementById('drawerSlidesCost').value) || 600;
+        const drawerSlidesCost = parseFloat(document.getElementById('slidePrice500').value) || 550; // Default to 500mm slide price for imports
         const handlesCost = parseFloat(document.getElementById('handlesCost').value) || 0;
         const finishCost = parseFloat(document.getElementById('finishCost').value) || 0;
         const laborRate = parseFloat(document.getElementById('laborRate').value) || 200;
@@ -2029,21 +2129,10 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Add data rows
         allCuts.forEach(cut => {
-            // Determine length and width based on grain direction
-            let length, width;
-            if (cut.grain === 'vertical') {
-                length = cut.height;
-                width = cut.width;
-            } else if (cut.grain === 'horizontal') {
-                length = cut.width;
-                width = cut.height;
-            } else {
-                // No grain direction
-                length = cut.width;
-                width = cut.height;
-            }
+            // Length is always the larger dimension
+            let length = Math.max(cut.width, cut.height);
+            let width = Math.min(cut.width, cut.height);
             
-            // Create label as "Cabinet Name - Part"
             const label = `"${cut.cabinetName} - ${cut.part}"`;
             const material = `"${cut.material}"`;
             
@@ -2155,20 +2244,27 @@ document.addEventListener('DOMContentLoaded', () => {
                     pieceDiv.style.top = (piece.y * SCALE) + 'px';
                     pieceDiv.style.width = (piece.width * SCALE) + 'px';
                     pieceDiv.style.height = (piece.height * SCALE) + 'px';
-                    pieceDiv.style.backgroundColor = partColors[piece.part] || '#E0E0E0';
+                    pieceDiv.style.backgroundColor = piece.oversized ? '#FF6B6B' : (partColors[piece.part] || '#E0E0E0');
+                    if (piece.oversized) {
+                        pieceDiv.style.border = '3px dashed #c0392b';
+                    }
                     
                     const label = document.createElement('div');
                     label.className = 'cut-piece-label';
-                    label.textContent = piece.part;
+                    label.textContent = piece.oversized ? `⚠ ${piece.part}` : piece.part;
                     
                     const dims = document.createElement('div');
                     dims.className = 'cut-piece-dims';
-                    // Display as placed on sheet (actual width x height as positioned)
-                    dims.textContent = `${piece.width}×${piece.height}`;
+                    // Show as Length × Width (larger first) for consistency with cut list
+                    const dimL = Math.max(piece.width, piece.height);
+                    const dimW = Math.min(piece.width, piece.height);
+                    dims.textContent = `${dimL}×${dimW}`;
                     
                     pieceDiv.appendChild(label);
                     pieceDiv.appendChild(dims);
-                    pieceDiv.title = `${piece.part}\n${piece.width}mm × ${piece.height}mm (as positioned on sheet)`;
+                    pieceDiv.title = piece.oversized 
+                        ? `⚠ OVERSIZED: ${piece.part}\nNeeds ${dimL}mm × ${dimW}mm but sheet is ${SHEET_WIDTH}×${SHEET_HEIGHT}mm\nThis piece needs to be joined from multiple cuts`
+                        : `${piece.part}\n${dimL}mm × ${dimW}mm\nOn sheet: ${piece.width}mm (x) × ${piece.height}mm (y)`;
                     
                     canvas.appendChild(pieceDiv);
                 });
@@ -2196,97 +2292,92 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function layoutPieces(pieces, sheetWidth, sheetHeight, kerf) {
-        // Sort pieces by area (largest first) for better packing
-        pieces.sort((a, b) => (b.width * b.height) - (a.width * a.height));
-        
         const sheets = [];
-        let currentSheet = { pieces: [], usedArea: [] };
         
-        pieces.forEach(piece => {
-            let placed = false;
+        // Normalize: shorter side = x-width, longer side = y-height
+        const normalized = pieces.map(p => {
+            const shorter = Math.min(p.width, p.height);
+            const longer = Math.max(p.width, p.height);
+            return { ...p, w: shorter, h: longer };
+        });
+        
+        // Group pieces by their width (x-dimension) for shared rip cuts
+        const widthGroups = {};
+        normalized.forEach(piece => {
+            const key = piece.w;
+            if (!widthGroups[key]) widthGroups[key] = [];
+            widthGroups[key].push(piece);
+        });
+        
+        // Sort groups: widest strips first (better packing)
+        const sortedWidths = Object.keys(widthGroups)
+            .map(Number)
+            .sort((a, b) => b - a);
+        
+        // Within each group, sort by height descending (tallest first)
+        sortedWidths.forEach(w => {
+            widthGroups[w].sort((a, b) => b.h - a.h);
+        });
+        
+        // Build strips: each strip is a column of same-width pieces
+        // One rip cut per strip, then cross cuts within
+        const strips = [];
+        sortedWidths.forEach(w => {
+            const group = widthGroups[w];
+            let stripPieces = [];
+            let usedHeight = 0;
             
-            // Determine allowed rotations based on grain direction
-            // In the cut list: width and height are already set correctly based on grain
-            // For horizontal grain: width is along grain (should be placed horizontally on sheet)
-            // For vertical grain: height is along grain (should be placed vertically on sheet)
-            
-            let rotationsToTry = [0]; // Default: try original orientation only
-            
-            if (piece.grain === 'none') {
-                // No grain preference, can try both orientations
-                rotationsToTry = [0, 1];
+            group.forEach(piece => {
+                const neededHeight = piece.h + (stripPieces.length > 0 ? kerf : 0);
+                if (usedHeight + neededHeight <= sheetHeight) {
+                    stripPieces.push(piece);
+                    usedHeight += neededHeight;
+                } else {
+                    // Current strip is full, save it and start new one
+                    if (stripPieces.length > 0) {
+                        strips.push({ width: w, height: usedHeight, pieces: stripPieces });
+                    }
+                    stripPieces = [piece];
+                    usedHeight = piece.h;
+                }
+            });
+            if (stripPieces.length > 0) {
+                strips.push({ width: w, height: usedHeight, pieces: stripPieces });
             }
-            // For horizontal and vertical grain, keep original orientation (rotationsToTry = [0])
+        });
+        
+        // Now pack strips onto sheets left-to-right
+        // Each strip uses: strip.width + kerf on x-axis
+        function createSheet() {
+            return { pieces: [], usedWidth: 0 };
+        }
+        
+        let currentSheet = createSheet();
+        
+        strips.forEach(strip => {
+            const stripW = strip.width + (currentSheet.usedWidth > 0 ? kerf : 0);
             
-            // Try to place in current sheet
-            for (let rotation of rotationsToTry) {
-                const w = rotation === 0 ? piece.width : piece.height;
-                const h = rotation === 0 ? piece.height : piece.width;
-                
-                // Check if piece fits in sheet dimensions
-                if (w > sheetWidth || h > sheetHeight) {
-                    continue; // Skip this rotation if it doesn't fit
+            if (currentSheet.usedWidth + stripW <= sheetWidth) {
+                // Place strip on current sheet
+                placeStrip(currentSheet, strip);
+            } else {
+                // Try existing sheets
+                let placed = false;
+                for (let s = 0; s < sheets.length; s++) {
+                    const sw = strip.width + (sheets[s].usedWidth > 0 ? kerf : 0);
+                    if (sheets[s].usedWidth + sw <= sheetWidth) {
+                        placeStrip(sheets[s], strip);
+                        placed = true;
+                        break;
+                    }
                 }
-                
-                // Try to find a position
-                const position = findPosition(currentSheet.usedArea, w, h, sheetWidth, sheetHeight, kerf);
-                
-                if (position) {
-                    currentSheet.pieces.push({
-                        ...piece,
-                        x: position.x,
-                        y: position.y,
-                        width: w,
-                        height: h
-                    });
-                    currentSheet.usedArea.push({
-                        x: position.x,
-                        y: position.y,
-                        width: w + kerf,
-                        height: h + kerf
-                    });
-                    placed = true;
-                    break;
+                if (!placed) {
+                    if (currentSheet.pieces.length > 0) {
+                        sheets.push(currentSheet);
+                    }
+                    currentSheet = createSheet();
+                    placeStrip(currentSheet, strip);
                 }
-            }
-            
-            // If not placed, start a new sheet
-            if (!placed) {
-                if (currentSheet.pieces.length > 0) {
-                    sheets.push(currentSheet);
-                }
-                currentSheet = { pieces: [], usedArea: [] };
-                
-                // Use original dimensions (already correct from cut list)
-                let w = piece.width;
-                let h = piece.height;
-                
-                // Only rotate if piece doesn't fit and has no grain preference
-                if ((w > sheetWidth || h > sheetHeight) && piece.grain === 'none') {
-                    // Try rotated
-                    [w, h] = [h, w];
-                }
-                
-                // Validate that piece fits in at least one orientation
-                if (w > sheetWidth || h > sheetHeight) {
-                    console.warn(`Piece ${piece.part} (${piece.width}×${piece.height}mm) is too large for sheet (${sheetWidth}×${sheetHeight}mm)`);
-                    // Still add it but it will be marked as oversized
-                }
-                
-                // Place in new sheet
-                currentSheet.pieces.push({
-                    ...piece,
-                    x: 0,
-                    y: 0,
-                    width: w,
-                    height: h
-                });
-                currentSheet.usedArea.push({
-                    x: 0,
-                    y: 0,
-                    width: w + kerf,
-                    height: h + kerf
-                });
             }
         });
         
@@ -2294,18 +2385,48 @@ document.addEventListener('DOMContentLoaded', () => {
             sheets.push(currentSheet);
         }
         
+        function placeStrip(sheet, strip) {
+            const x = sheet.usedWidth + (sheet.usedWidth > 0 ? kerf : 0);
+            let y = 0;
+            
+            strip.pieces.forEach(piece => {
+                // Check if piece fits on sheet
+                if (piece.w > sheetWidth || piece.h > sheetHeight) {
+                    console.warn(`Piece ${piece.part} (${piece.w}×${piece.h}mm) too large for sheet.`);
+                    sheet.pieces.push({
+                        ...piece,
+                        x: x,
+                        y: y,
+                        width: Math.min(piece.w, sheetWidth - x),
+                        height: Math.min(piece.h, sheetHeight - y),
+                        oversized: true
+                    });
+                } else {
+                    sheet.pieces.push({
+                        ...piece,
+                        x: x,
+                        y: y,
+                        width: piece.w,
+                        height: piece.h
+                    });
+                }
+                y += piece.h + kerf;
+            });
+            
+            sheet.usedWidth = x + strip.width;
+        }
+        
         return sheets;
     }
 
     function findPosition(usedArea, width, height, sheetWidth, sheetHeight, kerf) {
-        // Try positions along a grid
-        const step = 10; // Check every 10mm
+        // Legacy function kept for compatibility
+        const step = 10;
         
         for (let y = 0; y <= sheetHeight - height; y += step) {
             for (let x = 0; x <= sheetWidth - width; x += step) {
                 const testRect = { x, y, width: width + kerf, height: height + kerf };
                 
-                // Check if this position overlaps with any used area
                 let overlaps = false;
                 for (let used of usedArea) {
                     if (rectanglesOverlap(testRect, used)) {
@@ -2338,7 +2459,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>${title} - Pangan Cabinet Estimator</title>
+                <title>${title} - Likha Studio</title>
                 <style>
                     * {
                         margin: 0;
@@ -2477,6 +2598,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         font-weight: 600;
                         text-align: center;
                         padding: 3px;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
                     }
                     
                     .legend {
@@ -2510,6 +2633,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         width: 25px;
                         height: 18px;
                         border: 1px solid #000;
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
+                    }
+                    
+                    .sheet-canvas {
+                        -webkit-print-color-adjust: exact;
+                        print-color-adjust: exact;
                     }
                     
                     @media print {
