@@ -51,6 +51,7 @@ class Cabinet {
         this.numDoors = data.numDoors;
         this.numDrawers = data.numDrawers;
         this.drawerHeights = data.drawerHeights || [];
+        this.drawerWidths = data.drawerWidths || [];
         this.drawerSlideLength = data.drawerSlideLength || 500;
         this.numShelves = data.numShelves;
         this.numVerticalDividers = data.numVerticalDividers || 0;
@@ -223,7 +224,7 @@ class Cabinet {
         // 7. DRAWER COMPONENTS (if drawers exist)
         if (this.numDrawers > 0) {
             const drawerBoxDepth = this.drawerSlideLength; // Use selected slide length
-            const drawerBoxWidth = this.width - (2 * t) - 6; // Fit inside cabinet with clearance
+            const defaultDrawerBoxWidth = this.width - (2 * t) - 6; // Fit inside cabinet with clearance
 
             // Use custom drawer heights if provided, otherwise calculate evenly
             const drawerHeights = this.drawerHeights.length === this.numDrawers 
@@ -232,11 +233,16 @@ class Cabinet {
 
             drawerHeights.forEach((drawerOpeningHeight, index) => {
                 const drawerBoxHeight = drawerOpeningHeight - 40; // Clearance for slides and movement
+                
+                // Use custom drawer width if specified, otherwise full cabinet width
+                const customWidth = (this.drawerWidths && this.drawerWidths[index]) ? this.drawerWidths[index] : 0;
+                const drawerFrontWidth = customWidth > 0 ? customWidth : this.width;
+                const drawerBoxWidth = customWidth > 0 ? customWidth - (2 * t) - 6 : defaultDrawerBoxWidth;
 
                 // A. DRAWER FRONT - Overlay style, covers opening
                 cuts.push({
                     part: `Drawer ${index + 1} Front (Overlay)`,
-                    width: this.width,
+                    width: drawerFrontWidth,
                     height: drawerOpeningHeight,
                     thickness: t,
                     quantity: 1 * qty,
@@ -244,7 +250,7 @@ class Cabinet {
                     notes: `Full overlay front - ${(drawerOpeningHeight/10).toFixed(1)}cm`,
                     grain: this.getGrainDirection('vertical'),
                     edgeBanding: {
-                        front: (this.width * 2) + (drawerOpeningHeight * 2), // All 4 edges
+                        front: (drawerFrontWidth * 2) + (drawerOpeningHeight * 2), // All 4 edges
                         back: 0,
                         left: 0,
                         right: 0
@@ -971,20 +977,32 @@ document.addEventListener('DOMContentLoaded', () => {
         const oldWarning = document.getElementById('drawerWarning');
         if (oldWarning) oldWarning.remove();
         
+        const cabinetWidth = parseFloat(document.getElementById('width').value) || 0;
+        
         for (let i = 0; i < count; i++) {
             const div = document.createElement('div');
             div.className = 'form-group';
             div.style.marginBottom = '10px';
             div.innerHTML = `
-                <label for="drawer${i}Height">Drawer ${i + 1} Height (cm):</label>
-                <input type="number" id="drawer${i}Height" class="drawer-height-input" placeholder="15" step="0.1" min="5" value="15">
+                <label style="margin-bottom: 6px; display: block;">Drawer ${i + 1}:</label>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                    <div>
+                        <label for="drawer${i}Height" style="font-size: 0.8em; color: var(--text-tertiary);">Height (cm)</label>
+                        <input type="number" id="drawer${i}Height" class="drawer-height-input" placeholder="15" step="0.1" min="5" value="15">
+                    </div>
+                    <div>
+                        <label for="drawer${i}Width" style="font-size: 0.8em; color: var(--text-tertiary);">Width (cm)</label>
+                        <input type="number" id="drawer${i}Width" class="drawer-width-input" placeholder="${cabinetWidth ? cabinetWidth.toFixed(1) : 'auto'}" step="0.1" min="5" value="">
+                        <small style="color: var(--text-disabled); font-size: 0.75em;">Leave blank = full width</small>
+                    </div>
+                </div>
             `;
             drawerSizesInputs.appendChild(div);
             
             // Add validation listener
-            const input = div.querySelector('input');
-            input.addEventListener('change', validateDrawerHeights);
-            input.addEventListener('input', validateDrawerHeights);
+            const heightInput = div.querySelector('.drawer-height-input');
+            heightInput.addEventListener('change', validateDrawerHeights);
+            heightInput.addEventListener('input', validateDrawerHeights);
         }
         
         validateDrawerHeights();
@@ -1000,12 +1018,17 @@ document.addEventListener('DOMContentLoaded', () => {
     function getCabinetData() {
         const numDrawers = parseInt(document.getElementById('numDrawers').value) || 0;
         const drawerHeights = [];
+        const drawerWidths = [];
         
         if (numDrawers > 0) {
             for (let i = 0; i < numDrawers; i++) {
                 const heightInput = document.getElementById(`drawer${i}Height`);
                 const heightCm = heightInput ? parseFloat(heightInput.value) || 15 : 15;
-                drawerHeights.push(heightCm * 10); // Convert cm to mm for internal calculations
+                drawerHeights.push(heightCm * 10); // Convert cm to mm
+                
+                const widthInput = document.getElementById(`drawer${i}Width`);
+                const widthCm = widthInput ? parseFloat(widthInput.value) : 0;
+                drawerWidths.push(widthCm > 0 ? widthCm * 10 : 0); // 0 means full width
             }
         }
 
@@ -1026,6 +1049,7 @@ document.addEventListener('DOMContentLoaded', () => {
             numDoors: parseInt(document.getElementById('numDoors').value) || 0,
             numDrawers: numDrawers,
             drawerHeights: drawerHeights,
+            drawerWidths: drawerWidths,
             numShelves: parseInt(document.getElementById('numShelves').value) || 0,
             numVerticalDividers: parseInt(document.getElementById('numVerticalDividers').value) || 0,
             drawerSlideLength: parseInt(document.getElementById('drawerSlideLength').value) || 500,
@@ -1161,6 +1185,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     input.value = (height / 10).toFixed(1);
                 }
             });
+            if (cabinet.drawerWidths) {
+                cabinet.drawerWidths.forEach((width, i) => {
+                    const input = document.getElementById(`drawer${i}Width`);
+                    if (input && width > 0) {
+                        input.value = (width / 10).toFixed(1);
+                    }
+                });
+            }
         }
         
         // Switch to edit mode
