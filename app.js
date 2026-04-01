@@ -1,4 +1,4 @@
-// Cabinet Quotation Calculator
+﻿// Cabinet Quotation Calculator
 
 // Toast notification system
 function showToast(message, type = 'info', duration = 4000) {
@@ -58,7 +58,12 @@ class Cabinet {
         this.sheetMaterial = data.sheetMaterial;
         this.thickness = data.thickness;
         this.kerf = data.kerf || 3; // Kerf/cut thickness in mm
-        this.grainOrientation = data.grainOrientation || 'standard'; // Grain orientation preference
+        this.grainOrientation = data.grainOrientation || 'standard';
+        this.wall = data.wall || 'A';
+        this.marginT = data.marginT || 0;
+        this.marginL = data.marginL || 0;
+        this.marginB = data.marginB || 0;
+        this.marginR = data.marginR || 0;
     }
 
     getGrainDirection(standardGrain) {
@@ -1059,7 +1064,12 @@ document.addEventListener('DOMContentLoaded', () => {
             sheetMaterial: fullMaterialName,
             thickness: thickness,
             kerf: parseFloat(document.getElementById('kerf').value) || 3,
-            grainOrientation: grainOrientation
+            grainOrientation: grainOrientation,
+            wall: document.getElementById('cabinetWall').value || 'A',
+            marginT: (parseFloat(document.getElementById('cabinetMarginT').value) || 0) * 10,
+            marginL: (parseFloat(document.getElementById('cabinetMarginL').value) || 0) * 10,
+            marginB: (parseFloat(document.getElementById('cabinetMarginB').value) || 0) * 10,
+            marginR: (parseFloat(document.getElementById('cabinetMarginR').value) || 0) * 10
         };
     }
 
@@ -1079,6 +1089,11 @@ document.addEventListener('DOMContentLoaded', () => {
         drawerSizesContainer.style.display = 'none';
         drawerSizesInputs.innerHTML = '';
         document.getElementById('drawerSlideLength').value = '500';
+        document.getElementById('cabinetWall').value = 'A';
+        document.getElementById('cabinetMarginT').value = '0';
+        document.getElementById('cabinetMarginL').value = '0';
+        document.getElementById('cabinetMarginB').value = '0';
+        document.getElementById('cabinetMarginR').value = '0';
         updatePreSizeOptions();
         
         // Reset edit mode
@@ -1176,6 +1191,11 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('numDrawers').value = cabinet.numDrawers;
         document.getElementById('numShelves').value = cabinet.numShelves;
         document.getElementById('numVerticalDividers').value = cabinet.numVerticalDividers;
+        document.getElementById('cabinetWall').value = cabinet.wall || 'A';
+        document.getElementById('cabinetMarginT').value = (cabinet.marginT || 0) / 10;
+        document.getElementById('cabinetMarginL').value = (cabinet.marginL || 0) / 10;
+        document.getElementById('cabinetMarginB').value = (cabinet.marginB || 0) / 10;
+        document.getElementById('cabinetMarginR').value = (cabinet.marginR || 0) / 10;
         
         // Handle drawer heights
         if (cabinet.numDrawers > 0) {
@@ -1772,11 +1792,386 @@ document.addEventListener('DOMContentLoaded', () => {
         cutlistResults.style.display = 'none';
         simplifiedResults.style.display = 'none';
         cabinetDrawingsResults.style.display = 'block';
+        // Default to combined view
+        document.getElementById('combinedViewBtn').classList.add('active');
+        document.getElementById('individualViewBtn').classList.remove('active');
+        cabinetDrawingsContent.style.display = 'none';
+        document.getElementById('combinedViewSection').style.display = '';
+        buildCombinedLayout(cabinets);
         cabinetDrawingsResults.scrollIntoView({ behavior: 'smooth' });
     });
 
+    // Toggle between individual and combined views
+
+    document.getElementById('individualViewBtn').addEventListener('click', () => {
+        document.getElementById('individualViewBtn').classList.add('active');
+        document.getElementById('combinedViewBtn').classList.remove('active');
+        cabinetDrawingsContent.style.display = '';
+        document.getElementById('combinedViewSection').style.display = 'none';
+    });
+
+    document.getElementById('combinedViewBtn').addEventListener('click', () => {
+        document.getElementById('combinedViewBtn').classList.add('active');
+        document.getElementById('individualViewBtn').classList.remove('active');
+        cabinetDrawingsContent.style.display = 'none';
+        document.getElementById('combinedViewSection').style.display = '';
+        buildCombinedLayout(cabinets);
+    });
+
+    // Per-room (group) state: { groupName: { wallAssignments: {cabIdx: 'A'|'B'|'C'}, wallOrders: {A:[],B:[],C:[]}, shape: 'L'|'U', gap: 450 } }
+    let roomStates = {};
+
+    function initRoomState(groupName, cabIndices, cabs) {
+        // Build the expected set of entries for this room
+        const expected = [];
+        cabIndices.forEach(i => {
+            for (let u = 0; u < cabs[i].quantity; u++) {
+                const c = cabs[i];
+                expected.push({ idx: i, unit: u, wall: c.wall||'A', mt: c.marginT||0, ml: c.marginL||0, mb: c.marginB||0, mr: c.marginR||0 });
+            }
+        });
+
+        const existing = roomStates[groupName];
+        if (existing) {
+            // Check if entries match
+            const allExisting = [...existing.wallOrders.A, ...existing.wallOrders.B, ...existing.wallOrders.C];
+            const same = expected.length === allExisting.length && expected.every(e =>
+                allExisting.some(x => x.idx === e.idx && x.unit === e.unit)
+            );
+            if (same) return; // No change
+
+            // Cabinets changed — keep entries that still exist, add new ones to Wall A
+            const newOrders = { A: [], B: [], C: [] };
+            ['A','B','C'].forEach(w => {
+                existing.wallOrders[w].forEach(entry => {
+                    if (expected.some(e => e.idx === entry.idx && e.unit === entry.unit)) {
+                        newOrders[w].push(entry);
+                    }
+                });
+            });
+            // Add any new entries not yet placed
+            const placed = [...newOrders.A, ...newOrders.B, ...newOrders.C];
+            expected.forEach(e => {
+                if (!placed.some(p => p.idx === e.idx && p.unit === e.unit)) {
+                    newOrders[e.wall||'A'].push(e);
+                }
+            });
+            existing.wallOrders = newOrders;
+        } else {
+            const wo = { A: [], B: [], C: [] };
+            expected.forEach(e => { const w = e.wall || 'A'; wo[w].push(e); });
+            const hasC = expected.some(e => e.wall === 'C');
+            roomStates[groupName] = { wallOrders: wo, shape: hasC ? 'U' : 'L', gap: 450 };
+        }
+    }
+
+    function buildCombinedLayout(cabs) {
+        // Group cabinets by group (= room)
+        const groups = {};
+        cabs.forEach((cab, i) => {
+            const g = cab.group || 'Ungrouped';
+            if (!groups[g]) groups[g] = [];
+            groups[g].push(i);
+        });
+
+        // Init state for each room, remove stale rooms
+        Object.keys(groups).forEach(g => initRoomState(g, groups[g], cabs));
+        Object.keys(roomStates).forEach(g => { if (!groups[g]) delete roomStates[g]; });
+
+        // Render all rooms
+        const container = document.getElementById('combinedRoomsContainer');
+        container.innerHTML = '';
+
+        Object.keys(groups).sort().forEach(groupName => {
+            const roomDiv = document.createElement('div');
+            roomDiv.className = 'room-block';
+
+            const configDiv = document.createElement('div');
+            configDiv.className = 'combined-layout-config';
+
+            const state = roomStates[groupName];
+
+            configDiv.innerHTML = `
+                <h3 class="room-title">${groupName}</h3>
+                <div class="wall-config-row">
+                    <div class="wall-config-item">
+                        <label>Shape:</label>
+                        <select class="room-shape-select" data-room="${groupName}">
+                            <option value="L" ${state.shape==='L'?'selected':''}>L-Shape (2 walls)</option>
+                            <option value="U" ${state.shape==='U'?'selected':''}>U-Shape (3 walls)</option>
+                        </select>
+                    </div>
+                    <div class="wall-config-item">
+                        <label>Gap (cm):</label>
+                        <input type="number" class="room-gap-input" data-room="${groupName}" value="${state.gap/10}" min="0" max="200" step="1" style="width:70px;">
+                    </div>
+                </div>
+                <div class="room-wall-assignments" data-room="${groupName}"></div>
+            `;
+            roomDiv.appendChild(configDiv);
+
+            const hint = document.createElement('div');
+            hint.className = 'cabinet-drawing-hint';
+            hint.textContent = 'Drag to rotate · Drag items to reorder';
+            roomDiv.appendChild(hint);
+
+            const canvas = document.createElement('div');
+            canvas.className = 'cabinet-drawing-svg room-canvas';
+            canvas.dataset.room = groupName;
+            canvas.style.minHeight = '300px';
+            roomDiv.appendChild(canvas);
+
+            container.appendChild(roomDiv);
+
+            // Render wall assignments for this room
+            renderRoomWallAssignments(groupName, cabs);
+            renderRoomCombinedView(groupName, cabs);
+        });
+
+        // Attach shape/gap change handlers
+        container.querySelectorAll('.room-shape-select').forEach(sel => {
+            sel.addEventListener('change', e => {
+                const room = e.target.dataset.room;
+                roomStates[room].shape = e.target.value;
+                if (e.target.value === 'L') {
+                    const st = roomStates[room];
+                    st.wallOrders.A = st.wallOrders.A.concat(st.wallOrders.C);
+                    st.wallOrders.C = [];
+                }
+                renderRoomWallAssignments(room, cabs);
+                renderRoomCombinedView(room, cabs);
+            });
+        });
+        container.querySelectorAll('.room-gap-input').forEach(inp => {
+            const handler = () => { roomStates[inp.dataset.room].gap = (parseFloat(inp.value)||45)*10; renderRoomCombinedView(inp.dataset.room, cabs); };
+            inp.addEventListener('change', handler);
+            inp.addEventListener('input', handler);
+        });
+    }
+
+    function renderRoomWallAssignments(roomName, cabs) {
+        const state = roomStates[roomName];
+        const cont = document.querySelector(`.room-wall-assignments[data-room="${roomName}"]`);
+        if (!cont) return;
+        const wallList = state.shape === 'U' ? ['A','B','C'] : ['A','B'];
+        const wallNames = { A:'Wall A - Back', B:'Wall B - Left', C:'Wall C - Right' };
+        const badgeCls = { A:'wall-badge-a', B:'wall-badge-b', C:'wall-badge-c' };
+
+        let html = '';
+        wallList.forEach(wId => {
+            const order = state.wallOrders[wId] || [];
+            html += `<div class="wall-section"><div class="wall-section-header"><span class="wall-badge ${badgeCls[wId]}">${wId}</span> ${wallNames[wId]}</div>`;
+            html += `<div class="combined-layout-list" data-wall="${wId}" data-room="${roomName}">`;
+            if (order.length === 0) html += `<div class="combined-empty-msg">No cabinets - drag here or use dropdown</div>`;
+            order.forEach((entry, pos) => {
+                const cab = cabs[entry.idx];
+                const tl = {base:'Base',wall:'Wall',tall:'Tall',custom:'Custom'}[cab.cabinetType]||'Custom';
+                const mT=(entry.mt||0)/10, mL=(entry.ml||0)/10, mB=(entry.mb||0)/10, mR=(entry.mr||0)/10;
+                const unitLabel = cab.quantity > 1 ? ` #${entry.unit + 1}` : '';
+                const opts = wallList.map(w => `<option value="${w}" ${wId===w?'selected':''}>${w}</option>`).join('');
+                html += `<div class="wall-cab-item" draggable="true" data-entry-idx="${entry.idx}" data-entry-unit="${entry.unit}" data-mt="${entry.mt||0}" data-ml="${entry.ml||0}" data-mb="${entry.mb||0}" data-mr="${entry.mr||0}" data-wall="${wId}" data-room="${roomName}" data-pos="${pos}">`;
+                html += `<span class="drag-handle"><i class="bi bi-grip-vertical"></i></span>`;
+                html += `<span class="cab-name">${cab.name}${unitLabel}</span>`;
+                html += `<span class="cab-dims">${tl} · ${(cab.width/10).toFixed(1)}×${(cab.height/10).toFixed(1)}cm</span>`;
+                html += `<span class="margin-group">`;
+                html += `<input type="number" class="margin-input" data-room="${roomName}" data-wall="${wId}" data-pos="${pos}" data-side="mt" value="${mT}" min="0" step="0.5" placeholder="T" title="Top">`;
+                html += `<input type="number" class="margin-input" data-room="${roomName}" data-wall="${wId}" data-pos="${pos}" data-side="ml" value="${mL}" min="0" step="0.5" placeholder="L" title="Left">`;
+                html += `<input type="number" class="margin-input" data-room="${roomName}" data-wall="${wId}" data-pos="${pos}" data-side="mb" value="${mB}" min="0" step="0.5" placeholder="B" title="Bottom">`;
+                html += `<input type="number" class="margin-input" data-room="${roomName}" data-wall="${wId}" data-pos="${pos}" data-side="mr" value="${mR}" min="0" step="0.5" placeholder="R" title="Right">`;
+                html += `</span>`;
+                html += `<select data-entry-idx="${entry.idx}" data-entry-unit="${entry.unit}" data-room="${roomName}" class="wall-assign-select">${opts}</select>`;
+                html += `</div>`;
+            });
+            html += `</div></div>`;
+        });
+        cont.innerHTML = html;
+
+        // Margin input handlers
+        cont.querySelectorAll('.margin-input').forEach(inp => {
+            const handler = () => {
+                const rm = inp.dataset.room, wId = inp.dataset.wall, pos = parseInt(inp.dataset.pos), side = inp.dataset.side;
+                const st = roomStates[rm];
+                if (st && st.wallOrders[wId] && st.wallOrders[wId][pos]) {
+                    st.wallOrders[wId][pos][side] = (parseFloat(inp.value) || 0) * 10;
+                    renderRoomCombinedView(rm, cabs);
+                }
+            };
+            inp.addEventListener('change', handler);
+            inp.addEventListener('input', handler);
+        });
+
+        // Dropdown handlers
+        cont.querySelectorAll('.wall-assign-select').forEach(sel => {
+            sel.addEventListener('change', e => {
+                const eIdx = parseInt(e.target.dataset.entryIdx), eUnit = parseInt(e.target.dataset.entryUnit), rm = e.target.dataset.room;
+                const st = roomStates[rm], newW = e.target.value;
+                // Find and remove from current wall
+                for (const wk of ['A','B','C']) {
+                    const arr = st.wallOrders[wk];
+                    const fi = arr.findIndex(en => en.idx === eIdx && en.unit === eUnit);
+                    if (fi !== -1) { arr.splice(fi, 1); break; }
+                }
+                st.wallOrders[newW].push({ idx: eIdx, unit: eUnit, mt: 0, ml: 0, mb: 0, mr: 0 });
+                renderRoomWallAssignments(rm, cabs);
+                renderRoomCombinedView(rm, cabs);
+            });
+        });
+
+        // Drag-to-reorder
+        cont.querySelectorAll('.wall-cab-item[draggable]').forEach(item => {
+            item.addEventListener('dragstart', e => {
+                e.dataTransfer.setData('text/plain', JSON.stringify({ entryIdx: parseInt(item.dataset.entryIdx), entryUnit: parseInt(item.dataset.entryUnit), mt: parseFloat(item.dataset.mt)||0, ml: parseFloat(item.dataset.ml)||0, mb: parseFloat(item.dataset.mb)||0, mr: parseFloat(item.dataset.mr)||0, fromWall: item.dataset.wall, room: item.dataset.room, fromPos: parseInt(item.dataset.pos) }));
+                item.style.opacity = '0.4';
+            });
+            item.addEventListener('dragend', () => { item.style.opacity = '1'; });
+            item.addEventListener('dragover', e => { e.preventDefault(); item.classList.add('drag-over'); });
+            item.addEventListener('dragleave', () => { item.classList.remove('drag-over'); });
+            item.addEventListener('drop', e => {
+                e.preventDefault(); e.stopPropagation(); item.classList.remove('drag-over');
+                try {
+                    const from = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    if (from.room !== roomName) return;
+                    const st = roomStates[roomName], toW = item.dataset.wall, toPos = parseInt(item.dataset.pos);
+                    const fi = st.wallOrders[from.fromWall].findIndex(en => en.idx === from.entryIdx && en.unit === from.entryUnit);
+                    if (fi !== -1) st.wallOrders[from.fromWall].splice(fi, 1);
+                    st.wallOrders[toW].splice(toPos, 0, { idx: from.entryIdx, unit: from.entryUnit, mt: from.mt||0, ml: from.ml||0, mb: from.mb||0, mr: from.mr||0 });
+                    renderRoomWallAssignments(roomName, cabs);
+                    renderRoomCombinedView(roomName, cabs);
+                } catch(err) {}
+            });
+        });
+        cont.querySelectorAll('.combined-layout-list').forEach(list => {
+            list.addEventListener('dragover', e => e.preventDefault());
+            list.addEventListener('drop', e => {
+                if (e.target !== list && !e.target.classList.contains('combined-empty-msg')) return;
+                e.preventDefault();
+                try {
+                    const from = JSON.parse(e.dataTransfer.getData('text/plain'));
+                    if (from.room !== roomName) return;
+                    const st = roomStates[roomName], toW = list.dataset.wall;
+                    const fi = st.wallOrders[from.fromWall].findIndex(en => en.idx === from.entryIdx && en.unit === from.entryUnit);
+                    if (fi !== -1) st.wallOrders[from.fromWall].splice(fi, 1);
+                    st.wallOrders[toW].push({ idx: from.entryIdx, unit: from.entryUnit, mt: from.mt||0, ml: from.ml||0, mb: from.mb||0, mr: from.mr||0 });
+                    renderRoomWallAssignments(roomName, cabs);
+                    renderRoomCombinedView(roomName, cabs);
+                } catch(err) {}
+            });
+        });
+    }
+
+    function renderRoomCombinedView(roomName, cabs) {
+        const container = document.querySelector(`.room-canvas[data-room="${roomName}"]`);
+        if (!container) return;
+        container.innerHTML = '';
+        const state = roomStates[roomName];
+        if (!state) return;
+
+        const shape = state.shape;
+        const wallGapMM = state.gap;
+        const GAP = 4;
+
+        function getWallCabs(wId) {
+            const r = {base:[],wall:[]};
+            (state.wallOrders[wId]||[]).forEach(entry => { const c=cabs[entry.idx]; const item={...c,_mt:entry.mt||0,_ml:entry.ml||0,_mb:entry.mb||0,_mr:entry.mr||0}; if(c.cabinetType==='wall')r.wall.push(item);else r.base.push(item); });
+            return r;
+        }
+        const wA=getWallCabs('A'), wB=getWallCabs('B'), wC=shape==='U'?getWallCabs('C'):{base:[],wall:[]};
+        const allC=[...wA.base,...wA.wall,...wB.base,...wB.wall,...wC.base,...wC.wall];
+        if(allC.length===0) return;
+
+        function rw(a){return a.length>0?a.reduce((s,c)=>s+c.width,0)+GAP*(a.length-1):0;}
+        function rmh(a){return a.length>0?Math.max(...a.map(c=>c.height)):0;}
+
+        const maxBaseH=Math.max(rmh(wA.base),rmh(wB.base),rmh(wC.base),1);
+        const maxWallH=Math.max(rmh(wA.wall),rmh(wB.wall),rmh(wC.wall),0);
+        const allBaseCabs=[...wA.base,...wB.base,...wC.base];
+        const allWallCabs=[...wA.wall,...wB.wall,...wC.wall];
+        const maxBaseD=allBaseCabs.length>0?Math.max(...allBaseCabs.map(c=>c.depth)):0;
+        const maxWallD=allWallCabs.length>0?Math.max(...allWallCabs.map(c=>c.depth)):0;
+        const maxD=Math.max(maxBaseD,maxWallD,1);
+        const totalH=maxBaseH+(maxWallH>0?wallGapMM+maxWallH:0);
+        const aW=Math.max(rw(wA.base),rw(wA.wall));
+        const bW=Math.max(rw(wB.base),rw(wB.wall));
+        const cWw=Math.max(rw(wC.base),rw(wC.wall));
+        const sceneW=aW+maxD, sceneZ=Math.max(bW,cWw)+maxD*2;
+        const maxDim=Math.max(sceneW,totalH,sceneZ);
+        const scale=Math.min(400/maxDim,0.2);
+        const sSW=sceneW*scale, sSH=totalH*scale, sSZ=sceneZ*scale;
+        const baseHs=maxBaseH*scale, wallGapS=wallGapMM*scale;
+        const depthS=maxD*scale, baseDepthS=maxBaseD*scale, wallDepthS=maxWallD*scale;
+        const maxR=Math.sqrt(sSW*sSW+sSZ*sSZ+sSH*sSH)/2+60;
+        const fixedVB=Math.ceil(maxR*2);
+
+        let rotY=0.65, rotX=0.5, dragging=false, lastX=0, lastY=0, zoom=1;
+
+        function project(x,y,z){
+            const cx=x-sSW/2,cy=y-sSZ/2,cz=z-sSH/2;
+            const cY=Math.cos(rotY),sY=Math.sin(rotY),rx=cx*cY+cy*sY,ry=-cx*sY+cy*cY;
+            const cX=Math.cos(rotX),sX=Math.sin(rotX),ry2=ry*cX-cz*sX,rz2=ry*sX+cz*cX;
+            const f=900,ps=f/(f+ry2);
+            return{px:rx*ps,py:-rz2*ps,depth:ry2};
+        }
+
+        function render(){
+            const faces=[];
+            function addF(x1,y1,z1,x2,y2,z2,x3,y3,z3,x4,y4,z4,fill,stroke,sw,depthBias){const p=[project(x1,y1,z1),project(x2,y2,z2),project(x3,y3,z3),project(x4,y4,z4)];faces.push({type:'poly',pts:p.map(v=>`${v.px.toFixed(1)},${v.py.toFixed(1)}`).join(' '),depth:(p[0].depth+p[1].depth+p[2].depth+p[3].depth)/4+(depthBias||0),fill,stroke:stroke||'#555',strokeW:sw||0.7});}
+            function addL(x1,y1,z1,x2,y2,z2,stroke,sw,dashed){const a=project(x1,y1,z1),b=project(x2,y2,z2);faces.push({type:dashed?'dashed':'line',x1:a.px,y1:a.py,x2:b.px,y2:b.py,depth:(a.depth+b.depth)/2-100,stroke,strokeW:sw,cap:!dashed});}
+            function renderCab(cab,ox,oy,oz,dir,face){const cw=cab.width*scale,ch=cab.height*scale,cd=cab.depth*scale,g=Math.max(0.8*scale,0.5),fO=-1;let x0,y0,x1,y1;if(dir==='x'){x0=ox;y0=oy;x1=ox+cw;y1=oy+cd;}else{x0=ox;y0=oy;x1=ox+cd;y1=oy+cw;}const z0=oz,z1=oz+ch;addF(x0,y0,z0,x1,y0,z0,x1,y1,z0,x0,y1,z0,'#3d3530','#666',0.4);addF(x0,y0,z1,x1,y0,z1,x1,y1,z1,x0,y1,z1,'#5a4f42','#888',0.4);addF(x0,y0,z0,x1,y0,z0,x1,y0,z1,x0,y0,z1,'#4a4038','#777',0.4);addF(x0,y1,z0,x1,y1,z0,x1,y1,z1,x0,y1,z1,'#352f28','#555',0.4);addF(x0,y0,z0,x0,y1,z0,x0,y1,z1,x0,y0,z1,'#4a4038','#777',0.4);addF(x1,y0,z0,x1,y1,z0,x1,y1,z1,x1,y0,z1,'#352f28','#666',0.4);const DB=-50;let dBot=z0,dTop=z1;if(cab.numDrawers>0){const dH=cab.drawerHeights.length===cab.numDrawers?cab.drawerHeights:Array(cab.numDrawers).fill(Math.floor(cab.height/cab.numDrawers));let dz=z1;dH.forEach(dh=>{const sdh=dh*scale;dz-=sdh;if(face==='-y')addF(x0+g,y0+fO,dz+g,x1-g,y0+fO,dz+g,x1-g,y0+fO,dz+sdh-g,x0+g,y0+fO,dz+sdh-g,'rgba(108,203,95,0.22)','#6ccb5f',0.5,DB);else if(face==='+y')addF(x0+g,y1-fO,dz+g,x1-g,y1-fO,dz+g,x1-g,y1-fO,dz+sdh-g,x0+g,y1-fO,dz+sdh-g,'rgba(108,203,95,0.22)','#6ccb5f',0.5,DB);else if(face==='+x')addF(x1-fO,y0+g,dz+g,x1-fO,y1-g,dz+g,x1-fO,y1-g,dz+sdh-g,x1-fO,y0+g,dz+sdh-g,'rgba(108,203,95,0.22)','#6ccb5f',0.5,DB);else addF(x0+fO,y0+g,dz+g,x0+fO,y1-g,dz+g,x0+fO,y1-g,dz+sdh-g,x0+fO,y0+g,dz+sdh-g,'rgba(108,203,95,0.22)','#6ccb5f',0.5,DB);});dTop=dz;}if(cab.numDoors>0&&dTop-dBot>g*4){const nD=cab.numDoors;if(face==='-y'){const dW=(cw-g*(nD-1))/nD;for(let i=0;i<nD;i++){const dx=x0+i*(dW+g);addF(dx+g,y0+fO,dBot+g,dx+dW-g,y0+fO,dBot+g,dx+dW-g,y0+fO,dTop-g,dx+g,y0+fO,dTop-g,'rgba(212,175,55,0.18)','#d4af37',0.5,DB);}}else if(face==='+y'){const dW=(cw-g*(nD-1))/nD;for(let i=0;i<nD;i++){const dx=x0+i*(dW+g);addF(dx+g,y1-fO,dBot+g,dx+dW-g,y1-fO,dBot+g,dx+dW-g,y1-fO,dTop-g,dx+g,y1-fO,dTop-g,'rgba(212,175,55,0.18)','#d4af37',0.5,DB);}}else if(face==='+x'){const dW=(cw-g*(nD-1))/nD;for(let i=0;i<nD;i++){const dy=y0+i*(dW+g);addF(x1-fO,dy+g,dBot+g,x1-fO,dy+dW-g,dBot+g,x1-fO,dy+dW-g,dTop-g,x1-fO,dy+g,dTop-g,'rgba(212,175,55,0.18)','#d4af37',0.5,DB);}}else{const dW=(cw-g*(nD-1))/nD;for(let i=0;i<nD;i++){const dy=y0+i*(dW+g);addF(x0+fO,dy+g,dBot+g,x0+fO,dy+dW-g,dBot+g,x0+fO,dy+dW-g,dTop-g,x0+fO,dy+g,dTop-g,'rgba(212,175,55,0.18)','#d4af37',0.5,DB);}}}}
+            function renderRow(list,sx,sy,zBase,dir,face,topAlign){let off=0;const maxH=topAlign?Math.max(...list.map(c=>c.height*scale)):0;list.forEach(c=>{const cw=c.width*scale,ch=c.height*scale;const ml=(c._ml||0)*scale,mr=(c._mr||0)*scale,mt=(c._mt||0)*scale,mb=(c._mb||0)*scale;off+=ml;let oz=topAlign?zBase+maxH-ch-mt:zBase+mb;if(dir==='x')renderCab(c,sx+off,sy,oz,'x',face);else renderCab(c,sx,sy+off,oz,'y',face);off+=cw+mr+GAP*scale;});}
+            // Wall panels (semi-transparent white)
+            const wallH = sSH + 10;
+            const wc = 'rgba(255,255,255,0.08)';
+            const ws = 'rgba(255,255,255,0.15)';
+            // Wall A (back) - at y = depthS
+            if(wA.base.length+wA.wall.length>0){const ww=aW*scale+depthS;addF(0,depthS,0, ww,depthS,0, ww,depthS,wallH, 0,depthS,wallH, wc,ws,0.3);}
+            // Wall B (left) - at x = 0
+            if(wB.base.length+wB.wall.length>0){const wl=depthS+baseDepthS+bW*scale;addF(0,depthS,0, 0,wl,0, 0,wl,wallH, 0,depthS,wallH, wc,ws,0.3);}
+            // Wall C (right) - at x = aW*scale
+            if(shape==='U'&&(wC.base.length+wC.wall.length>0)){const cx=aW*scale;const wl=depthS+baseDepthS+cWw*scale;addF(cx,depthS,0, cx,wl,0, cx,wl,wallH, cx,depthS,wallH, wc,ws,0.3);}
+            // Floor
+            const floorW=aW*scale+depthS, floorD=depthS+baseDepthS+Math.max(bW,cWw)*scale;
+            addF(0,depthS,-0.5, floorW,depthS,-0.5, floorW,floorD,-0.5, 0,floorD,-0.5, 'rgba(255,255,255,0.08)','rgba(255,255,255,0.15)',0.3);
+
+            renderRow(wA.base,0,depthS,0,'x','+y');if(wA.wall.length>0)renderRow(wA.wall,0,depthS,baseHs+wallGapS,'x','+y',true);
+            renderRow(wB.base,0,depthS+baseDepthS,0,'y','+x');if(wB.wall.length>0)renderRow(wB.wall,0,depthS+wallDepthS,baseHs+wallGapS,'y','+x',true);
+            if(shape==='U'&&(wC.base.length>0||wC.wall.length>0)){renderRow(wC.base,aW*scale-baseDepthS,depthS+baseDepthS,0,'y','-x');if(wC.wall.length>0)renderRow(wC.wall,aW*scale-wallDepthS,depthS+wallDepthS,baseHs+wallGapS,'y','-x',true);}
+            if(maxWallH>0){const dx=sSW+8;addL(dx,0,baseHs,dx,0,baseHs+wallGapS,'#d4af37',0.7,true);addL(dx-2,0,baseHs,dx+2,0,baseHs,'#d4af37',0.5);addL(dx-2,0,baseHs+wallGapS,dx+2,0,baseHs+wallGapS,'#d4af37',0.5);}
+            faces.sort((a,b)=>b.depth-a.depth);const vbSize=fixedVB/zoom;const half=vbSize/2;
+            let svg=`<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-half} ${-half} ${vbSize} ${vbSize}" preserveAspectRatio="xMidYMid meet" shape-rendering="geometricPrecision" style="width:100%;height:100%;background:#1a1a1a;border-radius:8px;user-select:none;">`;
+            svg+=`<defs><style>.d3c-gap{font-family:Inter,sans-serif;font-size:9px;fill:#d4af37;text-anchor:start}.d3c-wl{font-family:Inter,sans-serif;font-size:10px;font-weight:700;text-anchor:middle}</style></defs>`;
+            faces.forEach(f=>{if(f.type==='poly')svg+=`<polygon points="${f.pts}" fill="${f.fill}" stroke="${f.stroke}" stroke-width="${f.strokeW}" stroke-linejoin="round"/>`;else if(f.type==='dashed')svg+=`<line x1="${f.x1.toFixed(1)}" y1="${f.y1.toFixed(1)}" x2="${f.x2.toFixed(1)}" y2="${f.y2.toFixed(1)}" stroke="${f.stroke}" stroke-width="${f.strokeW}" stroke-dasharray="4,3"/>`;else svg+=`<line x1="${f.x1.toFixed(1)}" y1="${f.y1.toFixed(1)}" x2="${f.x2.toFixed(1)}" y2="${f.y2.toFixed(1)}" stroke="${f.stroke}" stroke-width="${f.strokeW}" ${f.cap?'stroke-linecap="round"':''}/>`;});
+            if(wA.base.length+wA.wall.length>0){const p=project(aW*scale/2,depthS*2+8,baseHs+4);svg+=`<text x="${p.px.toFixed(1)}" y="${p.py.toFixed(1)}" class="d3c-wl" fill="#d4af37">A</text>`;}
+            if(wB.base.length+wB.wall.length>0){const p=project(maxD*scale+8,depthS*2+bW*scale/2,baseHs+4);svg+=`<text x="${p.px.toFixed(1)}" y="${p.py.toFixed(1)}" class="d3c-wl" fill="#6ccb5f">B</text>`;}
+            if(shape==='U'&&(wC.base.length+wC.wall.length>0)){const p=project(aW*scale-baseDepthS-8,depthS+baseDepthS+cWw*scale/2,baseHs+4);svg+=`<text x="${p.px.toFixed(1)}" y="${p.py.toFixed(1)}" class="d3c-wl" fill="#5fa8d3">C</text>`;}
+            if(maxWallH>0){const gm=project(sSW+12,0,baseHs+wallGapS/2);svg+=`<text x="${(gm.px+3).toFixed(1)}" y="${gm.py.toFixed(1)}" class="d3c-gap">${wallGapMM}mm</text>`;}
+            svg+=`</svg>`;container.innerHTML=svg;
+        }
+
+        render();
+
+        // Drag to rotate
+        let rafId = null;
+        function scheduleRender() { if (!rafId) { rafId = requestAnimationFrame(() => { rafId = null; render(); }); } }
+        container.style.cursor = 'grab';
+        container.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; container.style.cursor = 'grabbing'; e.preventDefault(); });
+        container.addEventListener('touchstart', (e) => { dragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; container.style.cursor = 'grabbing'; e.preventDefault(); }, { passive: false });
+        const onMove = (e) => { if (!dragging) return; const cx = e.clientX||(e.touches&&e.touches[0].clientX)||0; const cy = e.clientY||(e.touches&&e.touches[0].clientY)||0; rotY += (cx-lastX)*0.008; rotX = Math.max(-1.2, Math.min(1.2, rotX-(cy-lastY)*0.008)); lastX=cx; lastY=cy; scheduleRender(); };
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('touchmove', onMove, { passive: false });
+        const onUp = () => { dragging = false; container.style.cursor = 'grab'; };
+        window.addEventListener('mouseup', onUp);
+        window.addEventListener('touchend', onUp);
+        container.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.3, Math.min(5, zoom * (e.deltaY < 0 ? 1.1 : 0.9))); scheduleRender(); }, { passive: false });
+    }
+
     document.getElementById('printDrawingsBtn').addEventListener('click', () => {
-        printContent(cabinetDrawingsContent.innerHTML, 'Cabinet Drawings');
+        const isCombined = document.getElementById('combinedViewBtn').classList.contains('active');
+        if (isCombined) {
+            const container = document.getElementById('combinedRoomsContainer');
+            printContent(container.innerHTML, 'Combined Cabinet Layout');
+        } else {
+            printContent(cabinetDrawingsContent.innerHTML, 'Cabinet Drawings');
+        }
     });
 
     document.getElementById('backToQuoteFromDrawingsBtn').addEventListener('click', () => {
@@ -1916,8 +2311,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 drawerSlideLength: cabinet.drawerSlideLength,
                 numShelves: cabinet.numShelves,
                 numVerticalDividers: cabinet.numVerticalDividers,
-                grainOrientation: cabinet.grainOrientation
-            }))
+                grainOrientation: cabinet.grainOrientation,
+                wall: cabinet.wall,
+                marginT: cabinet.marginT,
+                marginL: cabinet.marginL,
+                marginB: cabinet.marginB,
+                marginR: cabinet.marginR
+            })),
+            roomLayouts: roomStates
         };
 
         // Create JSON file
@@ -2012,10 +2413,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         sheetMaterial: `${settings.sheetThickness}mm ${settings.sheetMaterial}`,
                         thickness: settings.sheetThickness,
                         kerf: settings.kerf,
-                        grainOrientation: cabinetData.grainOrientation || settings.grainOrientation
+                        grainOrientation: cabinetData.grainOrientation || settings.grainOrientation,
+                        wall: cabinetData.wall || 'A',
+                        marginT: cabinetData.marginT || 0,
+                        marginL: cabinetData.marginL || 0,
+                        marginB: cabinetData.marginB || 0,
+                        marginR: cabinetData.marginR || 0
                     });
                     cabinets.push(cabinet);
                 });
+                
+                // Restore room layouts if available
+                if (projectData.roomLayouts) {
+                    roomStates = projectData.roomLayouts;
+                } else {
+                    roomStates = {};
+                }
                 
                 // Update UI
                 updateCabinetList();
@@ -2449,6 +2862,7 @@ document.addEventListener('DOMContentLoaded', () => {
         function createCabinetRenderer(cabinet, container) {
             let rotY = 0.6;  // horizontal rotation (radians)
             let rotX = 0.45; // vertical tilt (radians)
+            let zoom = 1;
             let dragging = false;
             let lastX = 0, lastY = 0;
 
@@ -2603,8 +3017,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Sort by depth (painter's algorithm - far to near)
                 faces.sort((a, b) => b.depth - a.depth);
 
-                const half = fixedVB / 2;
-                let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-half} ${-half} ${fixedVB} ${fixedVB}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:${Math.max(fixedVB, 400)}px;height:auto;background:#1a1a1a;border-radius:8px;user-select:none;">`;
+                const vbSize = fixedVB / zoom;
+                const half = vbSize / 2;
+                let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-half} ${-half} ${vbSize} ${vbSize}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:${Math.max(fixedVB, 400)}px;height:auto;background:#1a1a1a;border-radius:8px;user-select:none;">`;
                 svg += `<defs><style>.d3-dim{font-family:Inter,sans-serif;font-size:11px;fill:#9a9a9a;text-anchor:middle}</style></defs>`;
 
                 faces.forEach(f => {
@@ -2674,6 +3089,7 @@ document.addEventListener('DOMContentLoaded', () => {
             window.addEventListener('touchmove', onPointerMove, { passive: false });
             window.addEventListener('mouseup', onPointerUp);
             window.addEventListener('touchend', onPointerUp);
+            container.addEventListener('wheel', (e) => { e.preventDefault(); zoom = Math.max(0.3, Math.min(5, zoom * (e.deltaY < 0 ? 1.1 : 0.9))); scheduleRender(); }, { passive: false });
 
             render();
         }

@@ -332,6 +332,13 @@ header p {
     grid-template-columns: 1fr 1fr 1fr 1fr;
 }
 
+.cabinet-row-4 {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 1fr 1fr;
+    gap: 10px;
+    margin-top: 10px;
+}
+
 /* Slide prices grid */
 .slide-prices-grid {
     display: grid;
@@ -1241,7 +1248,8 @@ header p {
 @media (max-width: 480px) {
     .cabinet-row-1,
     .cabinet-row-2,
-    .cabinet-row-3 {
+    .cabinet-row-3,
+    .cabinet-row-4 {
         grid-template-columns: 1fr 1fr !important;
     }
 
@@ -1424,6 +1432,16 @@ header p {
     overflow-x: auto;
 }
 
+.room-canvas {
+    min-height: 80vh;
+}
+
+.room-canvas svg {
+    width: 100% !important;
+    height: 80vh !important;
+    max-width: none !important;
+}
+
 .cabinet-drawing-legend {
     margin-top: 16px;
     padding: 16px;
@@ -1457,4 +1475,295 @@ header p {
     font-size: 0.78em;
     font-style: italic;
     border-bottom: 1px solid var(--border-subtle);
+}
+
+/* Drawing View Toggle */
+.drawing-view-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 16px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--border-strong);
+    width: fit-content;
+}
+
+.btn-toggle {
+    padding: 8px 20px;
+    font-size: 0.85em;
+    font-weight: 600;
+    font-family: inherit;
+    border: none;
+    background: var(--bg-subtle);
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-toggle:hover {
+    background: var(--bg-card-hover);
+    color: var(--text-primary);
+}
+
+.btn-toggle.active {
+    background: var(--accent);
+    color: #000;
+}
+
+/* Combined Layout Config */
+.combined-layout-config {
+    margin-bottom: 16px;
+    padding: 16px;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+}
+
+.combined-layout-config h3 {
+    color: var(--text-primary);
+    font-size: 0.95em;
+    font-weight: 600;
+    margin-bottom: 12px;
+}
+
+.combined-layout-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.combined-layout-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    cursor: grab;
+    transition: border-color 0.15s ease, background 0.15s ease;
+    user-select: none;
+}
+
+.combined-layout-item:active {
+    cursor: grabbing;
+}
+
+.combined-layout-item.drag-over {
+    border-color: var(--accent);
+    background: var(--accent-dim);
+}
+
+.combined-layout-item .drag-handle {
+    color: var(--text-disabled);
+    font-size: 1.1em;
+    flex-shrink: 0;
+}
+
+.combined-layout-item .layout-item-name {
+    flex: 1;
+    font-size: 0.9em;
+    font-weight: 500;
+    color: var(--text-primary);
+}
+
+.combined-layout-item .layout-item-dims {
+    font-size: 0.8em;
+    color: var(--text-tertiary);
+}
+
+.combined-layout-item .layout-item-pos {
+    font-size: 0.75em;
+    color: var(--accent);
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+}
+
+@media (max-width: 768px) {
+    .drawing-view-toggle {
+        width: 100%;
+    }
+    .btn-toggle {
+        flex: 1;
+        text-align: center;
+    }
+}
+
+/* Combined View - Wall Config */
+.wall-config-row {
+    display: flex;
+    gap: 16px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+
+.wall-config-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.88em;
+    color: var(--text-secondary);
+}
+
+.wall-config-item label {
+    font-weight: 500;
+    white-space: nowrap;
+}
+
+.wall-config-item select,
+.wall-config-item input {
+    padding: 6px 10px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-family: inherit;
+    font-size: 0.95em;
+}
+
+.wall-section {
+    margin-bottom: 14px;
+    padding: 12px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+}
+
+.wall-section:last-child {
+    margin-bottom: 0;
+}
+
+.wall-section-header {
+    font-size: 0.88em;
+    font-weight: 600;
+    margin-bottom: 8px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.wall-section-header .wall-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 3px;
+    font-size: 0.8em;
+    font-weight: 700;
+    color: #000;
+}
+
+.wall-badge-a { background: #d4af37; }
+.wall-badge-b { background: #6ccb5f; }
+.wall-badge-c { background: #5fa8d3; }
+
+.wall-cab-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px;
+    margin-bottom: 4px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    font-size: 0.84em;
+}
+
+.wall-cab-item:last-child {
+    margin-bottom: 0;
+}
+
+.wall-cab-item .cab-name {
+    flex: 1;
+    color: var(--text-primary);
+    font-weight: 500;
+}
+
+.wall-cab-item .cab-dims {
+    color: var(--text-tertiary);
+    font-size: 0.9em;
+}
+
+.wall-cab-item select {
+    padding: 4px 6px;
+    font-size: 0.9em;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-family: inherit;
+}
+
+.wall-group-label {
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--accent);
+    margin: 8px 0 4px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid var(--accent-dim);
+}
+
+.wall-group-label:first-child {
+    margin-top: 0;
+}
+
+/* Room Block */
+.room-block {
+    margin-bottom: 24px;
+    padding-bottom: 24px;
+    border-bottom: 2px solid var(--border-default);
+}
+
+.room-block:last-child {
+    border-bottom: none;
+    margin-bottom: 0;
+    padding-bottom: 0;
+}
+
+.room-title {
+    color: var(--text-primary);
+    font-size: 1.2em;
+    font-weight: 700;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.room-title::before {
+    content: '';
+    width: 4px;
+    height: 20px;
+    background: var(--accent);
+    border-radius: 2px;
+}
+
+/* Margin inputs in wall cab items */
+.margin-group {
+    display: inline-flex;
+    gap: 2px;
+    align-items: center;
+}
+
+.wall-cab-item .margin-input {
+    width: 36px;
+    padding: 2px 3px;
+    font-size: 0.75em;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+    color: var(--text-primary);
+    font-family: inherit;
+    text-align: center;
+}
+
+.wall-cab-item .margin-input:focus {
+    border-color: var(--accent);
+    outline: none;
+}
+
+.wall-cab-item .margin-input::placeholder {
+    color: var(--text-disabled);
+    font-size: 0.9em;
 }
