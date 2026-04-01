@@ -1853,6 +1853,7 @@ document.addEventListener('DOMContentLoaded', () => {
             settings: {
                 sheetMaterial: document.getElementById('sheetMaterial').value,
                 sheetCost: parseFloat(document.getElementById('sheetCost').value) || 5000,
+                sheet6mmCost: parseFloat(document.getElementById('sheet6mmCost').value) || 500,
                 sheetThickness: parseFloat(document.getElementById('sheetThickness').value) || 18,
                 grainOrientation: document.getElementById('grainOrientation').value || 'horizontal',
                 edgeBanding: parseFloat(document.getElementById('edgeBanding').value) || 50,
@@ -1884,9 +1885,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 numDoors: cabinet.numDoors,
                 numDrawers: cabinet.numDrawers,
                 drawerHeights: cabinet.drawerHeights,
+                drawerWidths: cabinet.drawerWidths,
                 drawerSlideLength: cabinet.drawerSlideLength,
                 numShelves: cabinet.numShelves,
-                numVerticalDividers: cabinet.numVerticalDividers
+                numVerticalDividers: cabinet.numVerticalDividers,
+                grainOrientation: cabinet.grainOrientation
             }))
         };
 
@@ -1940,6 +1943,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 const settings = projectData.settings;
                 document.getElementById('sheetMaterial').value = settings.sheetMaterial || 'PVC';
                 document.getElementById('sheetCost').value = settings.sheetCost || 5000;
+                document.getElementById('sheet6mmCost').value = settings.sheet6mmCost || 500;
                 document.getElementById('sheetThickness').value = settings.sheetThickness || 18;
                 document.getElementById('grainOrientation').value = settings.grainOrientation || 'horizontal';
                 document.getElementById('edgeBanding').value = settings.edgeBanding || 50;
@@ -1974,13 +1978,14 @@ document.addEventListener('DOMContentLoaded', () => {
                         numDoors: cabinetData.numDoors,
                         numDrawers: cabinetData.numDrawers,
                         drawerHeights: cabinetData.drawerHeights || [],
+                        drawerWidths: cabinetData.drawerWidths || [],
                         drawerSlideLength: cabinetData.drawerSlideLength || 500,
                         numShelves: cabinetData.numShelves,
                         numVerticalDividers: cabinetData.numVerticalDividers || 0,
                         sheetMaterial: `${settings.sheetThickness}mm ${settings.sheetMaterial}`,
                         thickness: settings.sheetThickness,
                         kerf: settings.kerf,
-                        grainOrientation: settings.grainOrientation
+                        grainOrientation: cabinetData.grainOrientation || settings.grainOrientation
                     });
                     cabinets.push(cabinet);
                 });
@@ -1991,8 +1996,10 @@ document.addEventListener('DOMContentLoaded', () => {
                     cabinetListSection.style.display = 'block';
                 }
                 
-                // Navigate to step 3 (Add Cabinets) to show loaded cabinets
-                goToStep(3);
+                // Navigate to last step (Review & Calculate) and auto-generate
+                goToStep(4);
+                updateCabinetListReview();
+                calculateBtn.click();
                 
                 showToast(`Project imported successfully! ${cabinets.length} cabinet(s) loaded.`, 'success');
                 
@@ -2693,13 +2700,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Function to print content in a new window
     function printContent(htmlContent, title) {
+        const clientName = document.getElementById('clientName').value || 'Client';
+        const projectName = document.getElementById('projectName').value || 'Project';
+        const date = new Date().toLocaleDateString();
+        const docTitle = `${clientName}-${projectName}-${title}-${date}`;
         const printWindow = window.open('', '_blank');
         printWindow.document.write(`
             <!DOCTYPE html>
             <html>
             <head>
                 <meta charset="UTF-8">
-                <title>${title} - Likha Studio</title>
+                <title>${docTitle}</title>
                 <style>
                     * {
                         margin: 0;
