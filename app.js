@@ -1903,7 +1903,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const clientName = projectData.projectInfo.clientName || 'Client';
         const projectName = projectData.projectInfo.projectName || 'Project';
         const date = new Date().toISOString().split('T')[0];
-        const filename = `${clientName.replace(/[^a-z0-9]/gi, '_')} - ${projectName.replace(/[^a-z0-9]/gi, '_')}_${date}.json`;
+        const filename = `${clientName}-${projectName}-Project-${date}.json`;
         
         link.setAttribute('href', url);
         link.setAttribute('download', filename);
