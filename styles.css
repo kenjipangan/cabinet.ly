@@ -1375,3 +1375,86 @@ header p {
         min-width: auto;
     }
 }
+
+/* Cabinet Drawings */
+.cabinet-drawing-card {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    margin-bottom: 20px;
+    overflow: hidden;
+    transition: border-color 0.15s ease;
+}
+
+.cabinet-drawing-card:hover {
+    border-color: var(--border-strong);
+}
+
+.cabinet-drawing-header {
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--border-subtle);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.cabinet-drawing-header h3 {
+    color: var(--text-primary);
+    font-size: 1.05em;
+    font-weight: 600;
+    margin: 0;
+}
+
+.cabinet-drawing-dims {
+    color: var(--text-tertiary);
+    font-size: 0.85em;
+}
+
+.cabinet-drawing-config {
+    color: var(--accent);
+    font-size: 0.85em;
+    font-weight: 500;
+}
+
+.cabinet-drawing-svg {
+    padding: 20px;
+    display: flex;
+    justify-content: center;
+    overflow-x: auto;
+}
+
+.cabinet-drawing-legend {
+    margin-top: 16px;
+    padding: 16px;
+    background: var(--bg-card);
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border-default);
+}
+
+@media (max-width: 768px) {
+    .cabinet-drawing-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .cabinet-drawing-svg {
+        padding: 10px;
+    }
+
+    .cabinet-drawing-svg svg {
+        max-width: 100%;
+        height: auto;
+    }
+}
+
+/* 3D Cabinet Drawing Hint */
+.cabinet-drawing-hint {
+    text-align: center;
+    padding: 6px;
+    color: var(--text-disabled);
+    font-size: 0.78em;
+    font-style: italic;
+    border-bottom: 1px solid var(--border-subtle);
+}

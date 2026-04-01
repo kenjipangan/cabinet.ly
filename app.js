@@ -643,6 +643,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const printQuoteBtn = document.getElementById('printQuoteBtn');
     const copyQuoteBtn = document.getElementById('copyQuoteBtn');
     const viewCutlistBtn = document.getElementById('viewCutlistBtn');
+    const viewCabinetDrawingsBtn = document.getElementById('viewCabinetDrawingsBtn');
     const simplifiedQuoteBtn = document.getElementById('simplifiedQuoteBtn');
     const printSimplifiedBtn = document.getElementById('printSimplifiedBtn');
     const copySimplifiedBtn = document.getElementById('copySimplifiedBtn');
@@ -668,6 +669,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const resultsSection = document.getElementById('results');
     const simplifiedResults = document.getElementById('simplifiedResults');
     const cutlistResults = document.getElementById('cutlistResults');
+    const cabinetDrawingsResults = document.getElementById('cabinetDrawingsResults');
+    const cabinetDrawingsContent = document.getElementById('cabinetDrawingsContent');
     const quotationContent = document.getElementById('quotationContent');
     const simplifiedQuotationContent = document.getElementById('simplifiedQuotationContent');
     const cutlistContent = document.getElementById('cutlistContent');
@@ -1728,6 +1731,7 @@ document.addEventListener('DOMContentLoaded', () => {
         generateCutlistView(cabinets, fullMaterialName, sheetMaterialName);
         resultsSection.style.display = 'block';
         cutlistResults.style.display = 'none';
+        cabinetDrawingsResults.style.display = 'none';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     });
 
@@ -1757,8 +1761,28 @@ document.addEventListener('DOMContentLoaded', () => {
 
     viewCutlistBtn.addEventListener('click', () => {
         resultsSection.style.display = 'none';
+        cabinetDrawingsResults.style.display = 'none';
         cutlistResults.style.display = 'block';
         cutlistResults.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    viewCabinetDrawingsBtn.addEventListener('click', () => {
+        generateCabinetDrawings(cabinets);
+        resultsSection.style.display = 'none';
+        cutlistResults.style.display = 'none';
+        simplifiedResults.style.display = 'none';
+        cabinetDrawingsResults.style.display = 'block';
+        cabinetDrawingsResults.scrollIntoView({ behavior: 'smooth' });
+    });
+
+    document.getElementById('printDrawingsBtn').addEventListener('click', () => {
+        printContent(cabinetDrawingsContent.innerHTML, 'Cabinet Drawings');
+    });
+
+    document.getElementById('backToQuoteFromDrawingsBtn').addEventListener('click', () => {
+        cabinetDrawingsResults.style.display = 'none';
+        resultsSection.style.display = 'block';
+        resultsSection.scrollIntoView({ behavior: 'smooth' });
     });
 
     printCutlistBtn.addEventListener('click', () => {
@@ -1778,6 +1802,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     backToQuoteBtn.addEventListener('click', () => {
         cutlistResults.style.display = 'none';
+        cabinetDrawingsResults.style.display = 'none';
         resultsSection.style.display = 'block';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     });
@@ -1785,6 +1810,7 @@ document.addEventListener('DOMContentLoaded', () => {
     simplifiedQuoteBtn.addEventListener('click', () => {
         displaySimplifiedQuote();
         resultsSection.style.display = 'none';
+        cabinetDrawingsResults.style.display = 'none';
         simplifiedResults.style.display = 'block';
         simplifiedResults.scrollIntoView({ behavior: 'smooth' });
     });
@@ -1806,6 +1832,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     backToDetailedBtn.addEventListener('click', () => {
         simplifiedResults.style.display = 'none';
+        cabinetDrawingsResults.style.display = 'none';
         resultsSection.style.display = 'block';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     });
@@ -2153,6 +2180,7 @@ document.addEventListener('DOMContentLoaded', () => {
         goToStep(4);
         resultsSection.style.display = 'block';
         cutlistResults.style.display = 'none';
+        cabinetDrawingsResults.style.display = 'none';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
     }
 
@@ -2411,6 +2439,292 @@ document.addEventListener('DOMContentLoaded', () => {
             exportCsvBtn.textContent = originalText;
         }, 2000);
     }
+
+    function generateCabinetDrawings(cabinets) {
+        cabinetDrawingsContent.innerHTML = '';
+
+        // Rotatable 3D cabinet renderer
+        // Each cabinet gets its own rotation state with drag-to-rotate interaction
+
+        function createCabinetRenderer(cabinet, container) {
+            let rotY = 0.6;  // horizontal rotation (radians)
+            let rotX = 0.45; // vertical tilt (radians)
+            let dragging = false;
+            let lastX = 0, lastY = 0;
+
+            const W = cabinet.width;
+            const H = cabinet.height;
+            const D = cabinet.depth;
+            const t = cabinet.thickness;
+            const maxDim = Math.max(W, H, D);
+            const scale = Math.min(320 / maxDim, 0.45);
+            const sw = W * scale, sh = H * scale, sd = D * scale;
+            const st = Math.max(t * scale, 1.5);
+
+            // 3D projection with arbitrary rotation
+            function project(x, y, z) {
+                // Center the model
+                const cx = x - sw / 2, cy = y - sd / 2, cz = z - sh / 2;
+                // Rotate around Y axis (horizontal drag)
+                const cosY = Math.cos(rotY), sinY = Math.sin(rotY);
+                const rx1 = cx * cosY + cy * sinY;
+                const ry1 = -cx * sinY + cy * cosY;
+                const rz1 = cz;
+                // Rotate around X axis (vertical drag)
+                const cosX = Math.cos(rotX), sinX = Math.sin(rotX);
+                const rx2 = rx1;
+                const ry2 = ry1 * cosX - rz1 * sinX;
+                const rz2 = ry1 * sinX + rz1 * cosX;
+                // Simple orthographic with slight perspective
+                const fov = 800;
+                const pScale = fov / (fov + ry2);
+                return { px: rx2 * pScale, py: -rz2 * pScale, depth: ry2 };
+            }
+
+            function quadPts(x1,y1,z1, x2,y2,z2, x3,y3,z3, x4,y4,z4) {
+                const pts = [project(x1,y1,z1), project(x2,y2,z2), project(x3,y3,z3), project(x4,y4,z4)];
+                const avgDepth = (pts[0].depth + pts[1].depth + pts[2].depth + pts[3].depth) / 4;
+                const str = pts.map(p => `${p.px.toFixed(1)},${p.py.toFixed(1)}`).join(' ');
+                return { str, avgDepth };
+            }
+
+            function linePts(x1,y1,z1, x2,y2,z2) {
+                const a = project(x1,y1,z1), b = project(x2,y2,z2);
+                return { x1: a.px, y1: a.py, x2: b.px, y2: b.py, depth: (a.depth + b.depth) / 2 };
+            }
+
+            // Fixed viewBox: use bounding sphere so size doesn't change on rotation
+            const maxRadius = Math.sqrt(sw * sw + sd * sd + sh * sh) / 2 + 35;
+            const fixedVB = Math.ceil(maxRadius * 2);
+
+            function render() {
+                // Collect all faces with depth for painter's algorithm
+                const faces = [];
+
+                function addFace(x1,y1,z1, x2,y2,z2, x3,y3,z3, x4,y4,z4, fill, stroke, strokeW) {
+                    const q = quadPts(x1,y1,z1, x2,y2,z2, x3,y3,z3, x4,y4,z4);
+                    // Compute face normal for backface culling
+                    const p0 = project(x1,y1,z1), p1 = project(x2,y2,z2), p2 = project(x3,y3,z3);
+                    const nx = (p1.px - p0.px) * (p2.py - p0.py) - (p1.py - p0.py) * (p2.px - p0.px);
+                    faces.push({ type: 'poly', pts: q.str, depth: q.avgDepth, fill, stroke: stroke || '#666', strokeW: strokeW || 1, normal: nx });
+                }
+
+                function addLine(x1,y1,z1, x2,y2,z2, stroke, strokeW, cap) {
+                    const l = linePts(x1,y1,z1, x2,y2,z2);
+                    faces.push({ type: 'line', ...l, depth: l.depth - 100, stroke, strokeW, cap });
+                }
+
+                // Back panel
+                addFace(st,sd-1,st, sw-st,sd-1,st, sw-st,sd-1,sh-st, st,sd-1,sh-st, '#252525', '#444', 0.5);
+
+                // Bottom faces
+                addFace(0,0,0, sw,0,0, sw,sd,0, 0,sd,0, '#3d3530', '#777', 1);
+                addFace(0,0,st, sw,0,st, sw,0,0, 0,0,0, '#4a4038', '#888', 1);
+                addFace(0,sd,0, sw,sd,0, sw,sd,st, 0,sd,st, '#352f28', '#666', 1);
+
+                // Top faces
+                addFace(0,0,sh, sw,0,sh, sw,sd,sh, 0,sd,sh, '#5a4f42', '#999', 1);
+                addFace(0,0,sh, sw,0,sh, sw,0,sh-st, 0,0,sh-st, '#4a4038', '#888', 1);
+                addFace(0,sd,sh-st, sw,sd,sh-st, sw,sd,sh, 0,sd,sh, '#352f28', '#666', 1);
+
+                // Left side faces
+                addFace(0,0,0, 0,sd,0, 0,sd,sh, 0,0,sh, '#4a4038', '#888', 1);
+                addFace(0,0,0, st,0,0, st,0,sh, 0,0,sh, '#5a4f42', '#999', 1);
+
+                // Right side faces
+                addFace(sw,0,0, sw,sd,0, sw,sd,sh, sw,0,sh, '#352f28', '#777', 1);
+                addFace(sw-st,0,0, sw,0,0, sw,0,sh, sw-st,0,sh, '#4a4038', '#888', 1);
+
+                // Shelves
+                if (cabinet.numShelves > 0) {
+                    const innerH = sh - 2 * st;
+                    const spacing = innerH / (cabinet.numShelves + 1);
+                    for (let i = 1; i <= cabinet.numShelves; i++) {
+                        const sz = st + spacing * i;
+                        addFace(st,st,sz, sw-st,st,sz, sw-st,sd-st,sz, st,sd-st,sz, 'rgba(186,225,255,0.18)', '#7ab8db', 0.8);
+                        addFace(st,0,sz, sw-st,0,sz, sw-st,0,sz-st*0.5, st,0,sz-st*0.5, 'rgba(186,225,255,0.12)', '#7ab8db', 0.6);
+                        addFace(st,sd-st,sz-st*0.5, sw-st,sd-st,sz-st*0.5, sw-st,sd-st,sz, st,sd-st,sz, 'rgba(186,225,255,0.08)', '#5a9ab5', 0.5);
+                    }
+                }
+
+                // Vertical dividers
+                if (cabinet.numVerticalDividers > 0) {
+                    const sections = cabinet.numVerticalDividers + 1;
+                    const innerW = sw - 2 * st;
+                    for (let i = 1; i <= cabinet.numVerticalDividers; i++) {
+                        const dx = st + (innerW / sections) * i;
+                        const dw = st * 0.4;
+                        addFace(dx,0,st, dx+dw,0,st, dx+dw,0,sh-st, dx,0,sh-st, 'rgba(224,187,228,0.2)', '#c49ec9', 0.6);
+                        addFace(dx,sd-st,st, dx+dw,sd-st,st, dx+dw,sd-st,sh-st, dx,sd-st,sh-st, 'rgba(224,187,228,0.1)', '#9a7a9e', 0.5);
+                        addFace(dx,0,sh-st, dx+dw,0,sh-st, dx+dw,sd-st,sh-st, dx,sd-st,sh-st, 'rgba(224,187,228,0.12)', '#c49ec9', 0.5);
+                    }
+                }
+
+                // Doors & Drawers
+                const gap = Math.max(1.5 * scale, 1);
+                const fOff = -2;
+                let doorBottom = 0, doorTop = sh;
+
+                if (cabinet.numDrawers > 0) {
+                    const dHeights = cabinet.drawerHeights.length === cabinet.numDrawers
+                        ? cabinet.drawerHeights
+                        : Array(cabinet.numDrawers).fill(Math.floor(H / cabinet.numDrawers));
+                    let dz = sh;
+                    dHeights.forEach((dh, i) => {
+                        const sdh = dh * scale;
+                        dz -= sdh;
+                        const dWidths = cabinet.drawerWidths || [];
+                        const cw = dWidths[i] || 0;
+                        const dw = cw > 0 ? cw * scale : sw;
+                        const dx = cw > 0 ? (sw - dw) / 2 : 0;
+                        addFace(dx+gap,fOff,dz+gap, dx+dw-gap,fOff,dz+gap, dx+dw-gap,fOff,dz+sdh-gap, dx+gap,fOff,dz+sdh-gap, 'rgba(108,203,95,0.18)', '#6ccb5f', 1.2);
+                        addFace(dx+gap,fOff,dz+sdh-gap, dx+dw-gap,fOff,dz+sdh-gap, dx+dw-gap,fOff+st*0.6,dz+sdh-gap, dx+gap,fOff+st*0.6,dz+sdh-gap, 'rgba(108,203,95,0.1)', '#6ccb5f', 0.5);
+                        addFace(dx+dw-gap,fOff,dz+gap, dx+dw-gap,fOff+st*0.6,dz+gap, dx+dw-gap,fOff+st*0.6,dz+sdh-gap, dx+dw-gap,fOff,dz+sdh-gap, 'rgba(108,203,95,0.08)', '#6ccb5f', 0.5);
+                        const hW = Math.min(dw * 0.2, 30);
+                        addLine(dx+(dw-hW)/2, fOff-1, dz+sdh*0.5, dx+(dw+hW)/2, fOff-1, dz+sdh*0.5, '#6ccb5f', 2.5, true);
+                    });
+                    doorTop = dz;
+                }
+
+                if (cabinet.numDoors > 0 && doorTop - doorBottom > gap * 4) {
+                    const doorW = (sw - gap * (cabinet.numDoors - 1)) / cabinet.numDoors;
+                    for (let i = 0; i < cabinet.numDoors; i++) {
+                        const dx = i * (doorW + gap);
+                        addFace(dx+gap,fOff,doorBottom+gap, dx+doorW-gap,fOff,doorBottom+gap, dx+doorW-gap,fOff,doorTop-gap, dx+gap,fOff,doorTop-gap, 'rgba(212,175,55,0.15)', '#d4af37', 1.2);
+                        addFace(dx+gap,fOff,doorTop-gap, dx+doorW-gap,fOff,doorTop-gap, dx+doorW-gap,fOff+st*0.6,doorTop-gap, dx+gap,fOff+st*0.6,doorTop-gap, 'rgba(212,175,55,0.08)', '#d4af37', 0.5);
+                        addFace(dx+doorW-gap,fOff,doorBottom+gap, dx+doorW-gap,fOff+st*0.6,doorBottom+gap, dx+doorW-gap,fOff+st*0.6,doorTop-gap, dx+doorW-gap,fOff,doorTop-gap, 'rgba(212,175,55,0.06)', '#d4af37', 0.5);
+                        const hH = Math.min((doorTop-doorBottom)*0.1, 22);
+                        const hx = (i < cabinet.numDoors/2) ? dx+doorW-gap-8 : dx+gap+6;
+                        const hz = doorBottom + (doorTop-doorBottom)*0.4;
+                        addLine(hx, fOff-1, hz, hx, fOff-1, hz+hH, '#d4af37', 2.5, true);
+                    }
+                }
+
+                // Sort by depth (painter's algorithm - far to near)
+                faces.sort((a, b) => b.depth - a.depth);
+
+                const half = fixedVB / 2;
+                let svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${-half} ${-half} ${fixedVB} ${fixedVB}" preserveAspectRatio="xMidYMid meet" style="width:100%;max-width:${Math.max(fixedVB, 400)}px;height:auto;background:#1a1a1a;border-radius:8px;user-select:none;">`;
+                svg += `<defs><style>.d3-dim{font-family:Inter,sans-serif;font-size:11px;fill:#9a9a9a;text-anchor:middle}</style></defs>`;
+
+                faces.forEach(f => {
+                    if (f.type === 'poly') {
+                        svg += `<polygon points="${f.pts}" fill="${f.fill}" stroke="${f.stroke}" stroke-width="${f.strokeW}" stroke-linejoin="round"/>`;
+                    } else {
+                        svg += `<line x1="${f.x1.toFixed(1)}" y1="${f.y1.toFixed(1)}" x2="${f.x2.toFixed(1)}" y2="${f.y2.toFixed(1)}" stroke="${f.stroke}" stroke-width="${f.strokeW}" ${f.cap ? 'stroke-linecap="round"' : ''}/>`;
+                    }
+                });
+
+                // Dimension labels (always visible, positioned at corners)
+                const bfl = project(0, -15, 0), bfr = project(sw, -15, 0), bfm = project(sw/2, -18, 0);
+                svg += `<line x1="${bfl.px.toFixed(1)}" y1="${bfl.py.toFixed(1)}" x2="${bfr.px.toFixed(1)}" y2="${bfr.py.toFixed(1)}" stroke="#666" stroke-width="0.7"/>`;
+                svg += `<text x="${bfm.px.toFixed(1)}" y="${(bfm.py - 5).toFixed(1)}" class="d3-dim">${W}mm</text>`;
+
+                const hb = project(-15, 0, 0), ht = project(-15, 0, sh), hm = project(-18, 0, sh/2);
+                svg += `<line x1="${hb.px.toFixed(1)}" y1="${hb.py.toFixed(1)}" x2="${ht.px.toFixed(1)}" y2="${ht.py.toFixed(1)}" stroke="#666" stroke-width="0.7"/>`;
+                svg += `<text x="${(hm.px - 5).toFixed(1)}" y="${hm.py.toFixed(1)}" class="d3-dim" text-anchor="end">${H}mm</text>`;
+
+                const db = project(sw+15, 0, 0), dt = project(sw+15, sd, 0), dm = project(sw+18, sd/2, 0);
+                svg += `<line x1="${db.px.toFixed(1)}" y1="${db.py.toFixed(1)}" x2="${dt.px.toFixed(1)}" y2="${dt.py.toFixed(1)}" stroke="#666" stroke-width="0.7"/>`;
+                svg += `<text x="${(dm.px + 5).toFixed(1)}" y="${dm.py.toFixed(1)}" class="d3-dim" text-anchor="start">${D}mm</text>`;
+
+                svg += `</svg>`;
+                container.innerHTML = svg;
+            }
+
+            // Attach drag handlers to the container (persists across re-renders)
+            let rafId = null;
+            function scheduleRender() {
+                if (!rafId) {
+                    rafId = requestAnimationFrame(() => {
+                        rafId = null;
+                        render();
+                    });
+                }
+            }
+
+            function onPointerDown(e) {
+                dragging = true;
+                lastX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                lastY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+                container.style.cursor = 'grabbing';
+                e.preventDefault();
+            }
+            function onPointerMove(e) {
+                if (!dragging) return;
+                const cx = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                const cy = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+                const dx = cx - lastX;
+                const dy = cy - lastY;
+                rotY += dx * 0.008;
+                rotX = Math.max(-1.2, Math.min(1.2, rotX - dy * 0.008));
+                lastX = cx;
+                lastY = cy;
+                scheduleRender();
+            }
+            function onPointerUp() {
+                dragging = false;
+                container.style.cursor = 'grab';
+            }
+
+            container.style.cursor = 'grab';
+            container.addEventListener('mousedown', onPointerDown);
+            container.addEventListener('touchstart', onPointerDown, { passive: false });
+            window.addEventListener('mousemove', onPointerMove);
+            window.addEventListener('touchmove', onPointerMove, { passive: false });
+            window.addEventListener('mouseup', onPointerUp);
+            window.addEventListener('touchend', onPointerUp);
+
+            render();
+        }
+
+        cabinets.forEach(cabinet => {
+            const W = cabinet.width, H = cabinet.height, D = cabinet.depth;
+            const config = [];
+            if (cabinet.numDoors > 0) config.push(`${cabinet.numDoors} door${cabinet.numDoors > 1 ? 's' : ''}`);
+            if (cabinet.numDrawers > 0) config.push(`${cabinet.numDrawers} drawer${cabinet.numDrawers > 1 ? 's' : ''}`);
+            if (cabinet.numShelves > 0) config.push(`${cabinet.numShelves} ${cabinet.numShelves > 1 ? 'shelves' : 'shelf'}`);
+            if (cabinet.numVerticalDividers > 0) config.push(`${cabinet.numVerticalDividers} divider${cabinet.numVerticalDividers > 1 ? 's' : ''}`);
+
+            const card = document.createElement('div');
+            card.className = 'cabinet-drawing-card';
+            const header = document.createElement('div');
+            header.className = 'cabinet-drawing-header';
+            header.innerHTML = `
+                <h3>${cabinet.name}</h3>
+                <span class="cabinet-drawing-dims">${(W/10).toFixed(1)} × ${(H/10).toFixed(1)} × ${(D/10).toFixed(1)} cm &nbsp;|&nbsp; Qty: ${cabinet.quantity}</span>
+                <span class="cabinet-drawing-config">${config.join(' · ')}</span>
+            `;
+            card.appendChild(header);
+
+            const hint = document.createElement('div');
+            hint.className = 'cabinet-drawing-hint';
+            hint.textContent = 'Drag to rotate';
+            card.appendChild(hint);
+
+            const svgContainer = document.createElement('div');
+            svgContainer.className = 'cabinet-drawing-svg';
+            card.appendChild(svgContainer);
+            cabinetDrawingsContent.appendChild(card);
+
+            createCabinetRenderer(cabinet, svgContainer);
+        });
+
+        // Legend
+        const legend = document.createElement('div');
+        legend.className = 'cabinet-drawing-legend';
+        legend.innerHTML = `
+            <div class="legend-title">Legend</div>
+            <div class="legend-items">
+                <div class="legend-item"><div class="legend-color" style="background:rgba(212,175,55,0.15);border:1.5px solid #d4af37;"></div><span class="legend-text">Door</span></div>
+                <div class="legend-item"><div class="legend-color" style="background:rgba(108,203,95,0.15);border:1.5px solid #6ccb5f;"></div><span class="legend-text">Drawer</span></div>
+                <div class="legend-item"><div class="legend-color" style="background:rgba(186,225,255,0.12);border:1.5px solid #7ab8db;"></div><span class="legend-text">Shelf</span></div>
+                <div class="legend-item"><div class="legend-color" style="background:rgba(224,187,228,0.15);border:1.5px solid #c49ec9;"></div><span class="legend-text">Divider</span></div>
+            </div>
+        `;
+        cabinetDrawingsContent.appendChild(legend);
+    }
+
 
     function generateCuttingDiagram(cabinets) {
         const diagramContainer = document.getElementById('cuttingDiagram');
