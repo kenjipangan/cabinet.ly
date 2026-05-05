@@ -682,29 +682,54 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Step navigation functions
     window.goToStep = function(step) {
-        // Hide all steps
         for (let i = 1; i <= 4; i++) {
             document.getElementById(`step${i}`).style.display = 'none';
             document.querySelector(`.step-item[data-step="${i}"]`).classList.remove('active');
         }
-        
-        // Show target step
         document.getElementById(`step${step}`).style.display = 'block';
         document.querySelector(`.step-item[data-step="${step}"]`).classList.add('active');
-        
-        // Mark completed steps
         for (let i = 1; i < step; i++) {
             document.querySelector(`.step-item[data-step="${i}"]`).classList.add('completed');
         }
-        
         currentStep = step;
-        
-        // Scroll to top
         window.scrollTo({ top: 0, behavior: 'smooth' });
-        
-        // Check if top nav should be visible after content loads
-        setTimeout(updateTopNavVisibility, 100);
+        updateFloatingNav();
     };
+
+    function updateFloatingNav() {
+        const backBtn = document.getElementById('floatingBackBtn');
+        const nextBtn = document.getElementById('floatingNextBtn');
+        const label = document.getElementById('floatingStepLabel');
+        if (!backBtn || !nextBtn || !label) return;
+
+        label.textContent = `Step ${currentStep} of 4`;
+        backBtn.style.display = currentStep > 1 ? '' : 'none';
+
+        if (currentStep === 4) {
+            nextBtn.innerHTML = '<i class="bi bi-calculator"></i> Generate Quote';
+        } else if (currentStep === 3) {
+            nextBtn.innerHTML = 'Review <i class="bi bi-chevron-right"></i>';
+        } else {
+            nextBtn.innerHTML = 'Next <i class="bi bi-chevron-right"></i>';
+        }
+    }
+
+    document.getElementById('floatingBackBtn').addEventListener('click', () => {
+        if (currentStep > 1) goToStep(currentStep - 1);
+    });
+
+    document.getElementById('floatingNextBtn').addEventListener('click', () => {
+        if (currentStep === 3) {
+            window.proceedToReview();
+        } else if (currentStep === 4) {
+            calculateBtn.click();
+        } else if (currentStep < 4) {
+            goToStep(currentStep + 1);
+        }
+    });
+
+    // Initialize floating nav
+    updateFloatingNav();
 
     window.proceedToReview = function() {
         if (cabinets.length === 0) {
@@ -787,28 +812,6 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     });
-
-    // Function to check if page is scrollable and show/hide top navigation
-    function updateTopNavVisibility() {
-        const topNavs = document.querySelectorAll('.step-navigation.top-nav');
-        const isScrollable = document.documentElement.scrollHeight > window.innerHeight;
-        
-        topNavs.forEach(nav => {
-            if (isScrollable) {
-                nav.classList.add('show');
-            } else {
-                nav.classList.remove('show');
-            }
-        });
-    }
-
-    // Check on page load and resize
-    updateTopNavVisibility();
-    window.addEventListener('resize', updateTopNavVisibility);
-    
-    // Also check when content changes (like adding cabinets)
-    const observer = new MutationObserver(updateTopNavVisibility);
-    observer.observe(document.body, { childList: true, subtree: true });
 
     // Standard modular cabinet sizes (in cm)
     const standardSizes = {
@@ -1173,6 +1176,7 @@ document.addEventListener('DOMContentLoaded', () => {
             // Adjust editing index if a cabinet before it was removed
             editingIndex--;
         }
+        if (typeof autosave === 'function') autosave();
     };
 
     window.editCabinet = function(index) {
@@ -1753,12 +1757,15 @@ document.addEventListener('DOMContentLoaded', () => {
         cutlistResults.style.display = 'none';
         cabinetDrawingsResults.style.display = 'none';
         resultsSection.scrollIntoView({ behavior: 'smooth' });
+        if (typeof autosave === 'function') autosave();
     });
 
-    // Top calculate button does the same thing
-    calculateBtnTop.addEventListener('click', () => {
-        calculateBtn.click();
-    });
+    // Top calculate button (may not exist if floating nav is used)
+    if (calculateBtnTop) {
+        calculateBtnTop.addEventListener('click', () => {
+            calculateBtn.click();
+        });
+    }
 
     resetCurrentBtn.addEventListener('click', () => {
         resetForm();
@@ -2155,7 +2162,7 @@ document.addEventListener('DOMContentLoaded', () => {
         container.style.cursor = 'grab';
         container.addEventListener('mousedown', (e) => { dragging = true; lastX = e.clientX; lastY = e.clientY; container.style.cursor = 'grabbing'; e.preventDefault(); });
         container.addEventListener('touchstart', (e) => { dragging = true; lastX = e.touches[0].clientX; lastY = e.touches[0].clientY; container.style.cursor = 'grabbing'; e.preventDefault(); }, { passive: false });
-        const onMove = (e) => { if (!dragging) return; const cx = e.clientX||(e.touches&&e.touches[0].clientX)||0; const cy = e.clientY||(e.touches&&e.touches[0].clientY)||0; rotY += (cx-lastX)*0.008; rotX = Math.max(-1.2, Math.min(1.2, rotX-(cy-lastY)*0.008)); lastX=cx; lastY=cy; scheduleRender(); };
+        const onMove = (e) => { if (!dragging) return; e.preventDefault(); const cx = e.clientX||(e.touches&&e.touches[0].clientX)||0; const cy = e.clientY||(e.touches&&e.touches[0].clientY)||0; rotY += (cx-lastX)*0.008; rotX = Math.max(-1.2, Math.min(1.2, rotX-(cy-lastY)*0.008)); lastX=cx; lastY=cy; scheduleRender(); };
         window.addEventListener('mousemove', onMove);
         window.addEventListener('touchmove', onMove, { passive: false });
         const onUp = () => { dragging = false; container.style.cursor = 'grab'; };
@@ -2263,9 +2270,8 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    function exportProject() {
-        // Gather all project data
-        const projectData = {
+    function buildProjectData() {
+        return {
             version: '1.0',
             exportDate: new Date().toISOString(),
             projectInfo: {
@@ -2320,6 +2326,10 @@ document.addEventListener('DOMContentLoaded', () => {
             })),
             roomLayouts: roomStates
         };
+    }
+
+    function exportProject() {
+        const projectData = buildProjectData();
 
         // Create JSON file
         const jsonContent = JSON.stringify(projectData, null, 2);
@@ -2347,6 +2357,330 @@ document.addEventListener('DOMContentLoaded', () => {
             exportProjectBtn.textContent = originalText;
         }, 2000);
     }
+
+    function loadProjectData(projectData) {
+        if (!projectData.version || !projectData.settings || !projectData.cabinets) {
+            showToast('Invalid project file format.', 'error');
+            return false;
+        }
+
+        if (projectData.projectInfo) {
+            document.getElementById('clientName').value = projectData.projectInfo.clientName || '';
+            document.getElementById('projectName').value = projectData.projectInfo.projectName || '';
+        }
+
+        const settings = projectData.settings;
+        document.getElementById('sheetMaterial').value = settings.sheetMaterial || 'PVC';
+        document.getElementById('sheetCost').value = settings.sheetCost || 5000;
+        document.getElementById('sheet6mmCost').value = settings.sheet6mmCost || 500;
+        document.getElementById('sheetThickness').value = settings.sheetThickness || 18;
+        document.getElementById('grainOrientation').value = settings.grainOrientation || 'horizontal';
+        document.getElementById('edgeBanding').value = settings.edgeBanding || 50;
+        document.getElementById('hingesCost').value = settings.hingesCost || 300;
+        if (settings.slidePrices) {
+            document.getElementById('slidePrice300').value = settings.slidePrices[300] || 350;
+            document.getElementById('slidePrice350').value = settings.slidePrices[350] || 400;
+            document.getElementById('slidePrice400').value = settings.slidePrices[400] || 450;
+            document.getElementById('slidePrice450').value = settings.slidePrices[450] || 500;
+            document.getElementById('slidePrice500').value = settings.slidePrices[500] || 550;
+            document.getElementById('slidePrice550').value = settings.slidePrices[550] || 600;
+        }
+        document.getElementById('handlesCost').value = settings.handlesCost || 0;
+        document.getElementById('screwsCost').value = settings.screwsCost || settings.finishCost || 150;
+        document.getElementById('laborHours').value = settings.laborHours || 8;
+        document.getElementById('laborRate').value = settings.laborRate || 200;
+        document.getElementById('markup').value = settings.markup || 70;
+        document.getElementById('overhead').value = settings.overhead || 0;
+        document.getElementById('kerf').value = settings.kerf || 3;
+
+        cabinets.length = 0;
+        projectData.cabinets.forEach(cabinetData => {
+            const cabinet = new Cabinet({
+                cabinetName: cabinetData.name,
+                cabinetGroup: cabinetData.group || 'Ungrouped',
+                quantity: cabinetData.quantity,
+                width: cabinetData.width,
+                height: cabinetData.height,
+                depth: cabinetData.depth,
+                cabinetType: cabinetData.cabinetType,
+                numDoors: cabinetData.numDoors,
+                numDrawers: cabinetData.numDrawers,
+                drawerHeights: cabinetData.drawerHeights || [],
+                drawerWidths: cabinetData.drawerWidths || [],
+                drawerSlideLength: cabinetData.drawerSlideLength || 500,
+                numShelves: cabinetData.numShelves,
+                numVerticalDividers: cabinetData.numVerticalDividers || 0,
+                sheetMaterial: `${settings.sheetThickness}mm ${settings.sheetMaterial}`,
+                thickness: settings.sheetThickness,
+                kerf: settings.kerf,
+                grainOrientation: cabinetData.grainOrientation || settings.grainOrientation,
+                wall: cabinetData.wall || 'A',
+                marginT: cabinetData.marginT || 0,
+                marginL: cabinetData.marginL || 0,
+                marginB: cabinetData.marginB || 0,
+                marginR: cabinetData.marginR || 0
+            });
+            cabinets.push(cabinet);
+        });
+
+        roomStates = projectData.roomLayouts || {};
+
+        updateCabinetList();
+        if (cabinets.length > 0) cabinetListSection.style.display = 'block';
+
+        goToStep(4);
+        updateCabinetListReview();
+        calculateBtn.click();
+        return true;
+    }
+
+    // Local Storage: Save/Load/List/Delete
+    const STORAGE_PREFIX = 'cabinet_project_';
+    const LAST_OPENED_KEY = 'cabinet_last_opened';
+
+    function saveProjectLocal(name) {
+        if (!name || !name.trim()) {
+            showToast('Please enter a project name.', 'warning');
+            return false;
+        }
+        const key = STORAGE_PREFIX + name.trim();
+        const payload = { ...buildProjectData(), savedAt: new Date().toISOString(), name: name.trim() };
+        try {
+            localStorage.setItem(key, JSON.stringify(payload));
+            localStorage.setItem(LAST_OPENED_KEY, name.trim());
+            showToast(`Project "${name.trim()}" saved to device.`, 'success');
+            return true;
+        } catch (e) {
+            showToast('Could not save: ' + e.message, 'error');
+            return false;
+        }
+    }
+
+    function loadProjectLocal(name) {
+        const key = STORAGE_PREFIX + name;
+        const data = localStorage.getItem(key);
+        if (!data) { showToast('Project not found.', 'error'); return; }
+        try {
+            const parsed = JSON.parse(data);
+            if (loadProjectData(parsed)) {
+                localStorage.setItem(LAST_OPENED_KEY, name);
+                showToast(`Loaded "${name}".`, 'success');
+                document.getElementById('savedProjectsModal').style.display = 'none';
+            }
+        } catch (e) {
+            showToast('Error loading project: ' + e.message, 'error');
+        }
+    }
+
+    function deleteProjectLocal(name) {
+        if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
+        localStorage.removeItem(STORAGE_PREFIX + name);
+        if (localStorage.getItem(LAST_OPENED_KEY) === name) localStorage.removeItem(LAST_OPENED_KEY);
+        showToast(`Deleted "${name}".`, 'info');
+        renderSavedProjectsList();
+    }
+
+    function listSavedProjects() {
+        const projects = [];
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(STORAGE_PREFIX)) {
+                const name = key.substring(STORAGE_PREFIX.length);
+                try {
+                    const d = JSON.parse(localStorage.getItem(key));
+                    projects.push({
+                        name,
+                        savedAt: d.savedAt,
+                        cabinetCount: (d.cabinets || []).length,
+                        clientName: d.projectInfo?.clientName || '',
+                        projectName: d.projectInfo?.projectName || name
+                    });
+                } catch (e) {}
+            }
+        }
+        projects.sort((a, b) => (b.savedAt || '').localeCompare(a.savedAt || ''));
+        return projects;
+    }
+
+    function renderSavedProjectsList() {
+        const listEl = document.getElementById('savedProjectsList');
+        const countEl = document.getElementById('savedProjectCount');
+        const infoEl = document.getElementById('saveProjectInfo');
+        const projects = listSavedProjects();
+
+        countEl.textContent = projects.length > 0 ? `(${projects.length})` : '';
+
+        let totalBytes = 0;
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith(STORAGE_PREFIX)) totalBytes += (localStorage.getItem(key) || '').length;
+        }
+        infoEl.textContent = projects.length > 0 ? `${projects.length} project(s) · ${(totalBytes/1024).toFixed(1)} KB used` : 'No saved projects yet';
+
+        if (projects.length === 0) {
+            listEl.innerHTML = '<div class="saved-project-empty">No saved projects. Save your current project above.</div>';
+            return;
+        }
+
+        listEl.innerHTML = projects.map(p => {
+            const date = p.savedAt ? new Date(p.savedAt).toLocaleString() : '';
+            return `
+                <div class="saved-project-item">
+                    <div class="saved-project-info">
+                        <div class="saved-project-name">${p.name}</div>
+                        <div class="saved-project-meta">${p.clientName ? p.clientName + ' · ' : ''}${p.projectName} · ${p.cabinetCount} cabinet${p.cabinetCount !== 1 ? 's' : ''}</div>
+                        <div class="saved-project-date">${date}</div>
+                    </div>
+                    <div class="saved-project-actions">
+                        <button class="btn-primary saved-load-btn" data-name="${p.name}"><i class="bi bi-folder2-open"></i> Load</button>
+                        <button class="btn-icon btn-icon-danger saved-delete-btn" data-name="${p.name}" title="Delete"><i class="bi bi-trash"></i></button>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+        listEl.querySelectorAll('.saved-load-btn').forEach(btn => {
+            btn.addEventListener('click', () => loadProjectLocal(btn.dataset.name));
+        });
+        listEl.querySelectorAll('.saved-delete-btn').forEach(btn => {
+            btn.addEventListener('click', () => deleteProjectLocal(btn.dataset.name));
+        });
+    }
+
+    // Header dropdown menu toggle
+    const headerMenuBtn = document.getElementById('headerMenuBtn');
+    const headerMenuDropdown = document.getElementById('headerMenuDropdown');
+    if (headerMenuBtn && headerMenuDropdown) {
+        headerMenuBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            headerMenuDropdown.classList.toggle('open');
+        });
+        document.addEventListener('click', (e) => {
+            if (!headerMenuDropdown.contains(e.target) && !headerMenuBtn.contains(e.target)) {
+                headerMenuDropdown.classList.remove('open');
+            }
+        });
+        headerMenuDropdown.querySelectorAll('.menu-item').forEach(item => {
+            item.addEventListener('click', () => headerMenuDropdown.classList.remove('open'));
+        });
+    }
+
+    // Saved Projects Modal handlers
+    document.getElementById('savedProjectsBtn').addEventListener('click', () => {
+        const projectName = document.getElementById('projectName').value || '';
+        const clientName = document.getElementById('clientName').value || '';
+        const suggestedName = [clientName, projectName].filter(Boolean).join(' - ') || 'My Project';
+        document.getElementById('saveProjectName').value = suggestedName;
+        document.getElementById('savedProjectsModal').style.display = 'flex';
+        renderSavedProjectsList();
+    });
+
+    document.getElementById('closeSavedProjectsBtn').addEventListener('click', () => {
+        document.getElementById('savedProjectsModal').style.display = 'none';
+    });
+
+    document.getElementById('savedProjectsModal').addEventListener('click', (e) => {
+        if (e.target.id === 'savedProjectsModal') {
+            document.getElementById('savedProjectsModal').style.display = 'none';
+        }
+    });
+
+    document.getElementById('saveProjectBtn').addEventListener('click', () => {
+        const name = document.getElementById('saveProjectName').value;
+        if (saveProjectLocal(name)) {
+            renderSavedProjectsList();
+        }
+    });
+
+    document.getElementById('saveProjectName').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') document.getElementById('saveProjectBtn').click();
+    });
+
+    // Autosave: silently save to localStorage using export-style naming
+    let autosaveTimer = null;
+    let autosaveEnabled = false;
+    let lastAutosaveKey = null;
+
+    function getAutosaveName() {
+        const clientName = (document.getElementById('clientName').value || 'Client').trim();
+        const projectName = (document.getElementById('projectName').value || 'Project').trim();
+        const date = new Date().toISOString().split('T')[0];
+        return `${clientName}-${projectName}-Project-${date}`;
+    }
+
+    function autosave() {
+        if (!autosaveEnabled) return;
+        if (cabinets.length === 0 && !document.getElementById('projectName').value) return;
+
+        clearTimeout(autosaveTimer);
+        autosaveTimer = setTimeout(() => {
+            try {
+                const name = getAutosaveName();
+                const key = STORAGE_PREFIX + name;
+
+                // If the name changed (client/project renamed), remove the old key
+                if (lastAutosaveKey && lastAutosaveKey !== key) {
+                    localStorage.removeItem(lastAutosaveKey);
+                }
+
+                const payload = {
+                    ...buildProjectData(),
+                    savedAt: new Date().toISOString(),
+                    name
+                };
+                localStorage.setItem(key, JSON.stringify(payload));
+                localStorage.setItem(LAST_OPENED_KEY, name);
+                lastAutosaveKey = key;
+
+                const indicator = document.getElementById('autosaveIndicator');
+                if (indicator) {
+                    indicator.textContent = 'Autosaved ' + new Date().toLocaleTimeString();
+                    indicator.classList.add('autosave-active');
+                    setTimeout(() => indicator.classList.remove('autosave-active'), 1500);
+                }
+            } catch (e) {
+                console.warn('Autosave failed:', e);
+            }
+        }, 800);
+    }
+
+    // Hook autosave into all form inputs
+    function enableAutosave() {
+        autosaveEnabled = true;
+        document.querySelectorAll('input, select, textarea').forEach(el => {
+            el.addEventListener('change', autosave);
+            el.addEventListener('input', autosave);
+        });
+    }
+
+    // Restore last opened project on load
+    function restoreLastOpened() {
+        const lastName = localStorage.getItem(LAST_OPENED_KEY);
+        if (!lastName) { enableAutosave(); return; }
+        const key = STORAGE_PREFIX + lastName;
+        const data = localStorage.getItem(key);
+        if (!data) { enableAutosave(); return; }
+        try {
+            const parsed = JSON.parse(data);
+            if (!parsed.cabinets || parsed.cabinets.length === 0) { enableAutosave(); return; }
+            const savedDate = parsed.savedAt ? new Date(parsed.savedAt).toLocaleString() : '';
+            if (confirm(`Restore last project "${lastName}"?\nLast saved: ${savedDate}`)) {
+                loadProjectData(parsed);
+                lastAutosaveKey = key;
+                showToast(`Restored "${lastName}".`, 'success');
+            }
+        } catch (e) {
+            console.warn('Could not restore:', e);
+        } finally {
+            enableAutosave();
+        }
+    }
+
+    addCabinetBtn.addEventListener('click', () => setTimeout(autosave, 100));
+    updateCabinetBtn.addEventListener('click', () => setTimeout(autosave, 100));
+
+    // Kick off restoration after DOM is ready
+    setTimeout(restoreLastOpened, 200);
 
     function importProject(file) {
         const reader = new FileReader();
@@ -3067,6 +3401,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
             function onPointerMove(e) {
                 if (!dragging) return;
+                e.preventDefault();
                 const cx = e.clientX || (e.touches && e.touches[0].clientX) || 0;
                 const cy = e.clientY || (e.touches && e.touches[0].clientY) || 0;
                 const dx = cx - lastX;
