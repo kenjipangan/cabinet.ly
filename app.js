@@ -2679,8 +2679,8 @@ document.addEventListener('DOMContentLoaded', () => {
     addCabinetBtn.addEventListener('click', () => setTimeout(autosave, 100));
     updateCabinetBtn.addEventListener('click', () => setTimeout(autosave, 100));
 
-    // Kick off restoration after DOM is ready
-    setTimeout(restoreLastOpened, 200);
+    // Autosave enabled on load (no auto-restore)
+    enableAutosave();
 
     function importProject(file) {
         const reader = new FileReader();
