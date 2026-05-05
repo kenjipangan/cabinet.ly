@@ -42,8 +42,8 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Segoe UI', Roboto, sans-serif;
     background: linear-gradient(180deg, #000000 0%, #1a1a1c 100%);
     min-height: 100vh;
-    padding: 0;
-    padding-top: env(safe-area-inset-top, 0px);
+    padding: 0 8px;
+    padding-top: calc(54px + env(safe-area-inset-top, 0px));
     padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
     line-height: 1.45;
     color: var(--text-primary);
