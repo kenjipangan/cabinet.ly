@@ -1799,12 +1799,20 @@ document.addEventListener('DOMContentLoaded', () => {
         cutlistResults.style.display = 'none';
         simplifiedResults.style.display = 'none';
         cabinetDrawingsResults.style.display = 'block';
-        // Default to combined view
-        document.getElementById('combinedViewBtn').classList.add('active');
-        document.getElementById('individualViewBtn').classList.remove('active');
-        cabinetDrawingsContent.style.display = 'none';
-        document.getElementById('combinedViewSection').style.display = '';
-        buildCombinedLayout(cabinets);
+
+        // Default: individual if 1 cabinet, combined if multiple
+        if (cabinets.length <= 1) {
+            document.getElementById('individualViewBtn').classList.add('active');
+            document.getElementById('combinedViewBtn').classList.remove('active');
+            cabinetDrawingsContent.style.display = '';
+            document.getElementById('combinedViewSection').style.display = 'none';
+        } else {
+            document.getElementById('combinedViewBtn').classList.add('active');
+            document.getElementById('individualViewBtn').classList.remove('active');
+            cabinetDrawingsContent.style.display = 'none';
+            document.getElementById('combinedViewSection').style.display = '';
+            buildCombinedLayout(cabinets);
+        }
         cabinetDrawingsResults.scrollIntoView({ behavior: 'smooth' });
     });
 
@@ -1845,7 +1853,19 @@ document.addEventListener('DOMContentLoaded', () => {
             const same = expected.length === allExisting.length && expected.every(e =>
                 allExisting.some(x => x.idx === e.idx && x.unit === e.unit)
             );
-            if (same) return; // No change
+            if (same) {
+                // Entries match — update margins from cabinet data
+                allExisting.forEach(entry => {
+                    const exp = expected.find(e => e.idx === entry.idx && e.unit === entry.unit);
+                    if (exp) {
+                        entry.mt = exp.mt;
+                        entry.ml = exp.ml;
+                        entry.mb = exp.mb;
+                        entry.mr = exp.mr;
+                    }
+                });
+                return;
+            }
 
             // Cabinets changed — keep entries that still exist, add new ones to Wall A
             const newOrders = { A: [], B: [], C: [] };
